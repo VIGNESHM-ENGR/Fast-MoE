@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -22,7 +23,8 @@ LOG_DIR = Path.home() / ".cache" / "fast-moe" / "logs"
 class RunSettings:
     model: str = DEFAULT_REPO
     quant: str = DEFAULT_QUANT
-    host: str = "127.0.0.1"
+    # Inside a container this must be 0.0.0.0 for the published port to reach llama-server.
+    host: str = field(default_factory=lambda: os.environ.get("FAST_MOE_API_HOST", "127.0.0.1"))
     port: int = 8080
     ctx: int | None = None
     vram_margin_mib: int | None = None

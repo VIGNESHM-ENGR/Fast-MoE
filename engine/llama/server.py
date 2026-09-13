@@ -52,7 +52,8 @@ def port_in_use(host: str, port: int) -> bool:
 class LlamaServer:
     def __init__(self, binary: Path, args: list[str], host: str, port: int, log_path: Path):
         self.command = [str(binary), *args, "--host", host, "--port", str(port)]
-        self.url = f"http://{host}:{port}"
+        connect_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+        self.url = f"http://{connect_host}:{port}"
         self.log_path = log_path
         self.tail: deque[str] = deque(maxlen=40)
         self.proc: subprocess.Popen | None = None

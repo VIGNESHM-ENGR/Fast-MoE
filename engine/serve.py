@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from engine.llama.fit import FitError
@@ -41,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--model", default=DEFAULT_REPO, help=f"GGUF file or Hugging Face repo (default {DEFAULT_REPO})")
     parser.add_argument("--quant", default=DEFAULT_QUANT, help=f"quantization when --model is a repo (default {DEFAULT_QUANT})")
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default=os.environ.get("FAST_MOE_API_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--ctx", type=int, help="minimum context to keep; more experts move to RAM to make room")
     parser.add_argument("--vram-margin-mib", type=int, help="VRAM to leave free (llama.cpp default 1024)")

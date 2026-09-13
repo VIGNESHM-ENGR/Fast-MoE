@@ -47,3 +47,17 @@ def test_repo_model_uses_local_copy_before_downloading(monkeypatch, tmp_path):
     monkeypatch.setattr(r, "local_model", lambda repo, quant: tmp_path / "x.gguf")
     monkeypatch.setattr(r, "download", lambda *a: pytest.fail("should not download"))
     assert r.resolve_model("org/Repo-GGUF", "Q4_K_M") == tmp_path / "x.gguf"
+
+
+def test_api_host_defaults_to_loopback_and_follows_env(monkeypatch):
+    monkeypatch.delenv("FAST_MOE_API_HOST", raising=False)
+    assert r.RunSettings().host == "127.0.0.1"
+    monkeypatch.setenv("FAST_MOE_API_HOST", "0.0.0.0")
+    assert r.RunSettings().host == "0.0.0.0"
+
+
+def test_server_url_uses_loopback_when_listening_on_all_interfaces(tmp_path):
+    from engine.llama.server import LlamaServer
+
+    assert LlamaServer(Path("/x"), [], "0.0.0.0", 8080, tmp_path / "l.log").url == "http://127.0.0.1:8080"
+    assert LlamaServer(Path("/x"), [], "192.168.1.5", 9000, tmp_path / "l.log").url == "http://192.168.1.5:9000"
