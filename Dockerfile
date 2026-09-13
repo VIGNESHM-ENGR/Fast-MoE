@@ -34,6 +34,7 @@ ENV LD_LIBRARY_PATH=/app:${LD_LIBRARY_PATH}
 # 127.0.0.1 only. HOME=/tmp keeps logs writable when running as a non-root user.
 ENV LLAMA_CPP_BIN_DIR=/app \
     FAST_MOE_MODELS_DIR=/models \
+    FAST_MOE_NVME_CACHE_DIR=/models \
     FAST_MOE_UI_HOST=0.0.0.0 \
     FAST_MOE_API_HOST=0.0.0.0 \
     HOME=/tmp \

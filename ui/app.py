@@ -256,7 +256,7 @@ def hardware_html() -> str:
       <h3><span>💾</span> Cold Tier Storage</h3>
       <div class="fm-hw-rows">
         <div class="fm-hw-row"><span class="k">Device Path:</span><span class="v">{escape(str(storage.path))}</span></div>
-        <div class="fm-hw-row"><span class="k">Drive Type:</span><span class="v">{escape(storage.kind.upper())} ({escape(storage.device or 'nvme')})</span></div>
+        <div class="fm-hw-row"><span class="k">Drive Type:</span><span class="v">{escape(storage.kind.upper())} ({escape(storage.device or 'unknown device')})</span></div>
         <div class="fm-hw-row"><span class="k">Free Capacity:</span><span class="v">{storage.free_bytes / GiB:.1f} GiB</span></div>
         <div class="fm-hw-row"><span class="k">Sequential Read:</span><span class="v" style="color: var(--cyan-bright);">{read_speed}</span></div>
         <div class="fm-hw-row"><span class="k">Sequential Write:</span><span class="v">{write_speed}</span></div>
