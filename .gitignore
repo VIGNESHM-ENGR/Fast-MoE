@@ -22,7 +22,8 @@ htmlcov/
 *.bin
 *.pt
 *.pth
-/models/
+/models/*
+!/models/README.md
 /weights/
 .cache/
 /huggingface/
@@ -37,7 +38,7 @@ htmlcov/
 *.so
 *.o
 *.obj
-third_party/build/
+/third_party/
 CMakeCache.txt
 CMakeFiles/
 

@@ -2,58 +2,48 @@
 
 ## Goal
 
-Let a single consumer/workstation machine (one GPU with 6-24 GB VRAM, system
-RAM, local NVMe) run large sparse Mixture-of-Experts LLMs beyond what fits
-in VRAM alone, by automatically tiering expert weights and KV cache across
-VRAM (hot) / RAM (warm) / NVMe (cold) — with no manual layer/offload flags —
-and by making that tiering visible and configurable through a Gradio UI.
+Make large sparse Mixture-of-Experts LLMs run on a single consumer machine
+(one GPU with 6-24 GB VRAM, system RAM, local NVMe) with zero manual tuning,
+and make it obvious — through a Gradio UI — where every expert lives (GPU,
+RAM, or disk) and what it costs.
 
-Reference test machine: RTX 3060 Laptop (6 GB VRAM), i5-11400H (AVX-512,
-6 cores), 38 GB RAM, NVMe SSD, running Qwen3-30B-A3B.
+Reference test machine: RTX 3060 Laptop (6 GB VRAM), i5-11400H (6 cores,
+AVX-512), 38 GB RAM, NVMe SSD, running Qwen3-30B-A3B at Q4_K_M.
 
-## Approach: orchestrator first
+## Approach: integrate tested projects
 
-The execution engine is [KTransformers](https://github.com/kvcache-ai/ktransformers)'
-`kt-kernel` running inside its SGLang fork `sglang-kt`, which already
-provides CPU expert kernels, GPU/CPU expert placement, a paged KV cache,
-CPU/disk KV offload and an OpenAI-compatible API. Fast-MoE's own work is
-what that stack lacks:
-
-1. **Zero-config**: hardware profiling and a model-aware launch plan that
-   derives every engine flag, each with a human-readable reason.
-2. **Weights**: fetching the right quantized files into the right tier.
-3. **Supervision**: one command / one `docker compose up` to run it all.
-4. **Visibility**: a Gradio UI for limits and a live map of which expert
-   lives in which tier.
-5. **Upstream gaps, measured first**: an NVMe cold tier for experts and
-   route-aware expert prefetching — built only where benchmarks show
-   upstream falls short.
+| Concern | Project used | Fast-MoE's part |
+|---|---|---|
+| Inference, CPU/GPU expert placement, context sizing | [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` with `--fit` | pick defaults, apply UI overrides, supervise |
+| RAM ↔ NVMe paging of weights | llama.cpp mmap + OS page cache | measure and visualize (M9) |
+| OpenAI-compatible API, metrics | `llama-server` (`/v1/chat/completions`, `/metrics`) | none |
+| Model downloads | `huggingface_hub` | quant selection, disk checks |
+| UI | Gradio | config, expert map, resources, chat |
+| Containers | official `ghcr.io/ggml-org/llama.cpp` images | compose file, UI image |
+| Hardware facts | NVML (`nvidia-ml-py`), `psutil` | cgroup-aware profile, tier budgets |
 
 ## In scope (v1)
 
-- Zero-config hardware profiling & allocation (VRAM, RAM, NVMe throughput,
-  cgroup limits, CPU instruction sets).
-- Generic MoE architecture support from `config.json`, validated against
-  Qwen3-MoE, Mixtral and DeepSeek-V2/V3.
-- Quantized expert weights, GGUF (LLAMAFILE backend) first.
-- OpenAI-compatible REST API (`/v1/chat/completions`, streaming).
-- Gradio UI: configuration + live tier visualization + chat.
-- Docker packaging: NVIDIA GPU passthrough and a CPU-only fallback.
-- Benchmarks against llama.cpp `--n-cpu-moe` on the same hardware.
+- Zero-config start: one command or `docker compose up`.
+- Quantized GGUF models (Q4_K_M default); generic across MoE families
+  llama.cpp supports (Qwen3-MoE, Mixtral, DeepSeek, ...).
+- Gradio UI: configuration, live expert-placement map, resource usage, chat.
+- Docker with NVIDIA GPU passthrough and a CPU-only profile.
+- Benchmarks against manual `--n-cpu-moe` tuning on the same hardware.
 
 ## Explicit non-goals (v1)
 
 - **No training or fine-tuning.** Inference only.
-- **No multi-GPU / tensor-parallel execution.** Exactly one GPU device.
-- **No new attention/GEMM kernels.** Kernels come from kt-kernel / SGLang.
+- **No custom kernels or inference engine.** llama.cpp does the compute.
+- **No full-precision weights.** Quantized GGUF only.
+- **No multi-GPU or multi-node serving.**
 - **No dense (non-MoE) models as a target.**
-- **No distributed / multi-node serving.** Single machine only.
 
-## Base dependency
+## Later / optional
 
-Fast-MoE depends on `kt-kernel` and `sglang-kt` (Apache-2.0) as pinned,
-installed packages rather than a vendored fork. Fast-MoE's code lives in
-`engine/`, `ui/`, `configs/` and `benchmarks/`, and touches KTransformers
-only through `engine/ktx_bridge/`.
+- KTransformers (`kt-kernel` + `sglang-kt`) backend for AMX-capable, high-RAM
+  machines (planner code kept in `engine/ktx_bridge/`).
+- Expert prefetching / NVMe pinning experiments, only if M9 measurements show
+  the OS page cache falls short.
 
 See [TASKS.md](TASKS.md) for milestones and the log of plan revisions.

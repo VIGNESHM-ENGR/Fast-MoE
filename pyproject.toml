@@ -5,21 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fast-moe"
 version = "0.1.0"
-description = "Tiered VRAM/RAM/NVMe inference engine for Mixture-of-Experts LLMs on consumer hardware"
+description = "Zero-config, visual runner for Mixture-of-Experts LLMs on consumer GPUs, built on llama.cpp"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
 dependencies = [
-    "torch>=2.3",
-    "safetensors>=0.4",
-    "pyyaml>=6.0",
     "psutil>=5.9",
     "nvidia-ml-py>=12.535",  # official NVML bindings; the `pynvml` PyPI package is deprecated
-    "fastapi>=0.110",
-    "uvicorn[standard]>=0.29",
-    "gradio>=4.30",
-    "pydantic>=2.6",
-    # kt-kernel + sglang-kt (the KTransformers runtime) get pinned in TASKS.md M4.
+    "pyyaml>=6.0",
+    "huggingface_hub>=1.0",
+    "gradio>=5.0",
+    # Inference runs in llama.cpp's llama-server (native build or official Docker image), not in Python.
 ]
 
 [project.optional-dependencies]

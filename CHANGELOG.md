@@ -18,11 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   throughput probe.
 - Budget allocator (`engine/hardware/allocator.py`): per-tier VRAM/RAM/disk
   budgets with safety reserves, user caps, and CPU-only fallback.
-- `python -m engine.hardware` prints the detected profile and tier budget.
+- `python -m engine.hardware` prints the detected profile and tier budget,
+  including CPU instruction sets, NUMA nodes and GPU compute capability.
+- MoE architecture descriptor (`engine/models/descriptor.py`) for Qwen3-MoE,
+  Mixtral and DeepSeek-V2/V3, with parameter and KV-cache sizing verified
+  against published model sizes.
+- Model downloader (`python -m engine.models.model_downloader`) for quantized
+  GGUF files into `models/`, built on `huggingface_hub`.
+- `scripts/build_llama_cpp.sh`: native CUDA build of a pinned llama.cpp release.
 
 ### Changed
-- Plan revised to "orchestrator first" on top of `kt-kernel` + `sglang-kt`
-  (KTransformers archived its YAML injection framework). Minimum VRAM target
-  lowered to 6 GB; GGUF via the LLAMAFILE backend is the first weight path.
-  Entrypoint renamed to `engine.serve`; the planned custom API server was
-  dropped because sglang-kt already serves an OpenAI-compatible API.
+- Inference runtime is llama.cpp's `llama-server` (Q4 GGUF only, automatic
+  CPU/GPU expert placement with `--fit`). The earlier KTransformers /
+  sglang-kt direction needed full-precision checkpoints; its launch planner is
+  kept in `engine/ktx_bridge/` for a possible later backend.
+- Minimum VRAM target lowered to 6 GB.
+- Python dependencies trimmed to profiling, downloads and UI (no torch).
+
+### Fixed
+- `.gitignore` no longer hides `engine/models/` and `tests/models/`.

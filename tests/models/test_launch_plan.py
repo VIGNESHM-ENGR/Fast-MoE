@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from engine.hardware.allocator import plan_budget
-from engine.hardware.profiler import GiB, CPUInfo
+from engine.hardware.profiler import CPUInfo, GiB
 from engine.ktx_bridge.launch_plan import InfeasiblePlan, plan_launch
 from engine.models.descriptor import describe_file
 from tests.factories import gpu, make_profile
