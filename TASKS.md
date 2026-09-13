@@ -38,34 +38,32 @@ logged at the bottom of this file.
 Turns "a HF model id + the M1 budget" into a complete, explained set of
 `sglang-kt` launch flags. Pure functions, fully unit-testable without a GPU.
 
-- [ ] Research: diff `config.json` fields across Qwen3-MoE, Mixtral,
+- [x] Research: diff `config.json` fields across Qwen3-MoE, Mixtral,
       DeepSeek-V2/V3 (`num_experts` vs `num_local_experts` vs
       `n_routed_experts`, shared experts, MLA vs GQA attention)
-- [ ] `engine/models/descriptor.py`: `MoEArchDescriptor` + per-family
+- [x] `engine/models/descriptor.py`: `MoEArchDescriptor` + per-family
       parsers; fail loudly on unknown architectures instead of guessing
-- [ ] Size model: non-expert weight bytes, per-expert bytes at a given
-      quantization, per-token KV cache bytes (GQA and MLA formulas)
-- [ ] Add CPU instruction-set + physical-core detection to the profiler
-      (needed for `--kt-method` and `--kt-cpuinfer`)
-- [ ] `engine/ktx_bridge/launch_plan.py`: budget + descriptor → flags —
-      `--kt-method` (LLAMAFILE first), `--kt-cpuinfer` (physical cores),
-      `--kt-threadpool-count` (NUMA nodes), `--kt-num-gpu-experts`,
-      `--mem-fraction-static`, context length from leftover VRAM for KV,
-      `--chunked-prefill-size`; placement priority: dense weights → KV
-      cache → hot experts
-- [ ] Every derived flag carries a human-readable reason (feeds the UI)
-- [ ] Unit tests: real `config.json` fixtures for Qwen3-30B-A3B, Mixtral
-      8x7B, DeepSeek-V2-Lite × the synthetic hardware profiles from M1
+- [x] Size model: dense params, per-expert params, per-token KV cache bytes
+      (GQA and MLA). Verified against published totals: Qwen3-30B-A3B 30.5B /
+      3.3B active, Mixtral 46.7B / 12.9B, DeepSeek-V3 671B / 37B
+- [x] GGUF bits-per-weight measured from real file sizes (Q4_K_M 4.86)
+- [x] CPU instruction sets, physical cores, NUMA nodes, GPU compute
+      capability added to the profiler
+- [x] `engine/ktx_bridge/launch_plan.py`: dense weights → KV cache → GPU
+      experts → extra context; every flag carries a reason. Flag semantics
+      checked in sglang-kt 0.7.0.post3 source (`--kt-num-gpu-experts` is
+      per MoE layer; `--kt-threadpool-count` defaults to 2; `--kt-method`
+      defaults to AMXINT4)
+- [x] Unit tests: 4 real `config.json` fixtures × synthetic hardware profiles
+      (53 tests total). Laptop result: 2.87 GiB dense + 19.5K-token KV on GPU,
+      16.4 GiB Q4_K_M experts in RAM
 
 ## M3 — Weight acquisition
 
-- [ ] Download GGUF experts (e.g. `Qwen/Qwen3-30B-A3B-GGUF` Q4_K_M) into
-      the cold-tier directory, with disk-space check against the M1 budget
-- [ ] Research: does `sglang-kt` need expert tensors present in `--model`
-      when experts run on CPU? If not, fetch only non-expert tensors
-      (~3 GB instead of ~61 GB) using safetensors headers + HTTP range
-      requests; otherwise download the full checkpoint
-- [ ] Resumable downloads + integrity check; progress events for the UI
+- [ ] Download via `huggingface_hub.snapshot_download` (resumable,
+      integrity-checked): BF16 checkpoint (~61 GB) + `Qwen/Qwen3-30B-A3B-GGUF`
+      Q4_K_M (18.6 GB), with a disk-space check against the M1 budget
+- [ ] Progress events for the UI
 
 ## M4 — Launcher & supervisor (`python -m engine.serve --model <id>`)
 
@@ -149,3 +147,16 @@ Turns "a HF model id + the M1 budget" into a complete, explained set of
 - First weight path is **GGUF via the LLAMAFILE backend** (no conversion,
   runs on any AVX2 CPU).
 - KV-cache vs. hot-expert VRAM split moved from M1 to M2 (needs model sizes).
+
+**2026-09-13 — during M2: integrate, don't invent**
+- kt-kernel ships a `kt` CLI (`run`, `model`, `doctor`, `bench`, `chat`,
+  `quant`) plus an empirical GPU-expert tuner (`tuna_engine.py`). Fast-MoE
+  reuses these instead of writing its own: `kt doctor` for environment
+  checks, `huggingface_hub` / `kt model` for downloads, `kt bench` for
+  benchmarks, `tuna` as an optional refinement after first launch.
+- Fast-MoE keeps only what upstream lacks: non-interactive zero-config flags
+  (`kt run` falls back to an interactive wizard, and its non-interactive
+  defaults — AMXINT4, mem-fraction 0.98, 40K KV — don't fit a 6 GB laptop),
+  the Gradio UI, and Docker packaging.
+- Dropped from M3: custom HTTP-range download of non-expert tensors
+  (invention). Download the full checkpoint with `huggingface_hub`.

@@ -8,9 +8,23 @@ from engine.hardware.profiler import GiB, GPUInfo, MiB
 
 def gpus():
     return (
-        GPUInfo(0, "a", "GPU-aaaa-1111", 8 * GiB, 8 * GiB),
-        GPUInfo(1, "b", "GPU-bbbb-2222", 24 * GiB, 24 * GiB),
+        GPUInfo(0, "a", "GPU-aaaa-1111", 8 * GiB, 8 * GiB, (8, 6)),
+        GPUInfo(1, "b", "GPU-bbbb-2222", 24 * GiB, 24 * GiB, (8, 9)),
     )
+
+
+def test_parse_cpu_flags_reads_first_flags_line():
+    cpuinfo = "processor\t: 0\nflags\t\t: fpu avx2 avx512f\n\nprocessor\t: 1\nflags\t\t: fpu\n"
+    assert profiler.parse_cpu_flags(cpuinfo) == frozenset({"fpu", "avx2", "avx512f"})
+    assert profiler.parse_cpu_flags("") == frozenset()
+
+
+def test_numa_node_count(tmp_path):
+    node_dir = tmp_path / "devices" / "system" / "node"
+    for name in ("node0", "node1", "possible", "has_cpu"):
+        (node_dir / name).mkdir(parents=True)
+    assert profiler.count_numa_nodes(tmp_path) == 2
+    assert profiler.count_numa_nodes(tmp_path / "missing") == 1
 
 
 def test_visible_devices_unset_keeps_all():

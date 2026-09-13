@@ -36,6 +36,15 @@ class GPUInfo:
     uuid: str
     total_bytes: int
     free_bytes: int
+    compute_capability: tuple[int, int]
+
+
+@dataclass(frozen=True)
+class CPUInfo:
+    physical_cores: int
+    logical_threads: int
+    numa_nodes: int
+    flags: frozenset[str]
 
 
 @dataclass(frozen=True)
@@ -60,7 +69,7 @@ class HardwareProfile:
     gpus: tuple[GPUInfo, ...]
     memory: MemoryInfo
     storage: StorageInfo
-    cpu_threads: int
+    cpu: CPUInfo
 
 
 def probe_gpus() -> tuple[GPUInfo, ...]:
@@ -86,11 +95,39 @@ def probe_gpus() -> tuple[GPUInfo, ...]:
                     uuid=pynvml.nvmlDeviceGetUUID(handle),
                     total_bytes=mem.total,
                     free_bytes=mem.free,
+                    compute_capability=tuple(pynvml.nvmlDeviceGetCudaComputeCapability(handle)),
                 )
             )
     finally:
         pynvml.nvmlShutdown()
     return filter_visible_gpus(tuple(gpus), os.environ.get("CUDA_VISIBLE_DEVICES"))
+
+
+def parse_cpu_flags(cpuinfo: str) -> frozenset[str]:
+    for line in cpuinfo.splitlines():
+        if line.startswith("flags"):
+            return frozenset(line.split(":", 1)[1].split())
+    return frozenset()
+
+
+def count_numa_nodes(sysfs_root: Path = Path("/sys")) -> int:
+    node_dir = sysfs_root / "devices" / "system" / "node"
+    nodes = [p for p in node_dir.glob("node*") if p.name[4:].isdigit()] if node_dir.is_dir() else []
+    return max(1, len(nodes))
+
+
+def probe_cpu() -> CPUInfo:
+    logical = len(os.sched_getaffinity(0))
+    # Physical cores, not hyperthreads: kt-kernel's CPU expert kernels are memory-bandwidth
+    # bound and slow down when two threads share a core. Clamped to the affinity mask so
+    # `docker --cpuset-cpus` is respected.
+    physical = min(psutil.cpu_count(logical=False) or logical, logical)
+    return CPUInfo(
+        physical_cores=physical,
+        logical_threads=logical,
+        numa_nodes=count_numa_nodes(),
+        flags=parse_cpu_flags(Path("/proc/cpuinfo").read_text()),
+    )
 
 
 def filter_visible_gpus(gpus: tuple[GPUInfo, ...], visible: str | None) -> tuple[GPUInfo, ...]:
@@ -260,5 +297,5 @@ def profile_hardware(
         gpus=probe_gpus(),
         memory=probe_memory(),
         storage=probe_storage(resolve_cache_dir(cache_dir), probe_bytes),
-        cpu_threads=len(os.sched_getaffinity(0)),
+        cpu=probe_cpu(),
     )

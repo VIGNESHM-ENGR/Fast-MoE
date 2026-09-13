@@ -27,7 +27,9 @@ def main() -> None:
 
     print("== Hardware profile ==")
     for g in profile.gpus:
-        print(f"GPU {g.index}: {g.name}  total {_gib(g.total_bytes)}  free {_gib(g.free_bytes)}")
+        cc = ".".join(map(str, g.compute_capability))
+        print(f"GPU {g.index}: {g.name}  total {_gib(g.total_bytes)}  free {_gib(g.free_bytes)}  "
+              f"compute {cc}")
     if not profile.gpus:
         print("GPU: none")
     m = profile.memory
@@ -37,7 +39,10 @@ def main() -> None:
     speed = (f"read {s.read_bytes_per_s / MiB:.0f} MiB/s  write {s.write_bytes_per_s / MiB:.0f} MiB/s"
              if s.read_bytes_per_s else "not probed")
     print(f"Cold tier: {s.path} on {s.device or '?'} ({s.kind})  free {_gib(s.free_bytes)}  {speed}")
-    print(f"CPU threads: {profile.cpu_threads}")
+    c = profile.cpu
+    simd = [f for f in ("avx2", "avx512f", "avx512_vnni", "avx512_bf16", "amx_int8") if f in c.flags]
+    print(f"CPU: {c.physical_cores} cores / {c.logical_threads} threads, {c.numa_nodes} NUMA node(s), "
+          f"{' '.join(simd) or 'no AVX2'}")
 
     print("\n== Tier budget ==")
     print(f"VRAM (hot):  {_gib(budget.vram_bytes)}"

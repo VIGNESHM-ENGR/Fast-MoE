@@ -1,24 +1,10 @@
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
 from engine.hardware.allocator import AllocatorSettings, plan_budget
-from engine.hardware.profiler import GiB, GPUInfo, HardwareProfile, MemoryInfo, MiB, StorageInfo
-
-
-def gpu(total_gib: float, free_gib: float, index: int = 0) -> GPUInfo:
-    return GPUInfo(index, f"gpu{index}", f"GPU-{index}", int(total_gib * GiB), int(free_gib * GiB))
-
-
-def make_profile(gpus=(), ram_total=32, ram_avail=28, disk_free=500, kind="nvme", read_mib=3000):
-    return HardwareProfile(
-        gpus=tuple(gpus),
-        memory=MemoryInfo(int(ram_total * GiB), int(ram_avail * GiB), None),
-        storage=StorageInfo(Path("/mnt/nvme_cache"), "nvme0n1", kind, int(disk_free * GiB),
-                            read_mib * MiB, read_mib * MiB),
-        cpu_threads=12,
-    )
+from engine.hardware.profiler import GiB
+from tests.factories import gpu, make_profile
 
 
 def test_laptop_6gb_uses_minimum_reserve():
