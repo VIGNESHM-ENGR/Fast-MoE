@@ -13,3 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `docker-compose.yml` skeletons, `.gitignore`, `.dockerignore`,
   Apache-2.0 `LICENSE`.
 - Project docs: `README.md`, `PROJECT_SCOPE.md`, `TASKS.md`.
+- Hardware profiler (`engine/hardware/profiler.py`): NVML GPU detection,
+  cgroup-aware RAM detection, cold-tier device classification and
+  throughput probe.
+- Budget allocator (`engine/hardware/allocator.py`): per-tier VRAM/RAM/disk
+  budgets with safety reserves, user caps, and CPU-only fallback.
+- `python -m engine.hardware` prints the detected profile and tier budget.

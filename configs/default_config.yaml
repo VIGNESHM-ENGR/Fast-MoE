@@ -8,9 +8,13 @@ model:
   quantization: null # null = auto-select (INT4/INT8/GGUF); see TASKS.md M3
 
 hardware:
-  vram_reserve_fraction: 0.15 # headroom for activations/workspace
-  nvme_cache_dir: null # e.g. "/mnt/nvme_cache"; null = auto-detect fastest local mount
+  vram_reserve_fraction: 0.15 # headroom for activations/workspace (never less than 1 GiB)
+  nvme_cache_dir: null # null = $FAST_MOE_NVME_CACHE_DIR, then /mnt/nvme_cache, then ~/.cache/fast-moe/swap
   cpu_only: false
+  # Caps in bytes on what each tier may use; null = use everything the allocator deems safe.
+  max_vram_bytes: null
+  max_ram_bytes: null
+  max_disk_bytes: null
 
 memory:
   kv_block_size: null # tokens per KV page; null = auto-tuned (M4)

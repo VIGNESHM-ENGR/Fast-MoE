@@ -15,22 +15,26 @@ summarized in `PROJECT_SCOPE.md`.
 - [x] `configs/default_config.yaml`
 - [x] `Dockerfile`, `docker-compose.yml` skeletons (real content in M9)
 - [x] `README.md`, `PROJECT_SCOPE.md`, `CHANGELOG.md`, `TASKS.md`
-- [ ] First commit (no co-author/attribution line, per project convention)
+- [x] First commit (no co-author/attribution line, per project convention)
 
 ## M1 — Hardware profiler & budget allocator
 
-- [ ] Decide GPU query path: `pynvml` vs `torch.cuda` (prefer whichever
-      works without requiring a CUDA-initialized torch context up front)
-- [ ] `engine/hardware/profiler.py`: GPU count/name/total-free VRAM
-- [ ] `engine/hardware/profiler.py`: system RAM total/available (`psutil`)
-- [ ] `engine/hardware/profiler.py`: NVMe mount detection + measured
-      sequential read throughput probe; flag non-NVMe (HDD/network) mounts
-- [ ] `engine/hardware/allocator.py`: VRAM activation headroom (~15%),
-      KV-cache vs. hot-expert VRAM split, RAM warm-buffer sizing, NVMe cold
-      path mapping
-- [ ] Unit tests (`tests/hardware/`): allocator budget math on 3+ synthetic
-      profiles (e.g. 8GB/24GB VRAM × 32GB/128GB RAM)
-- [ ] Manual run on dev machine; sanity-check the printed plan
+- [x] Decide GPU query path → NVML via `nvidia-ml-py` (no CUDA context
+      needed; `pynvml` PyPI package is deprecated). Honors `CUDA_VISIBLE_DEVICES`
+- [x] `engine/hardware/profiler.py`: GPU count/name/total-free VRAM
+- [x] `engine/hardware/profiler.py`: system RAM total/available (`psutil`),
+      clamped to the cgroup v1/v2 memory limit so Docker limits are respected
+- [x] `engine/hardware/profiler.py`: cold-tier dir resolution, backing device
+      classification (partition / LVM / LUKS / btrfs aware), sequential
+      read/write probe with page-cache eviction
+- [x] `engine/hardware/allocator.py`: VRAM reserve (15%, min 1 GiB), RAM
+      headroom, pinned staging buffer, disk headroom, user caps, CPU fallback
+- [x] Unit tests (`tests/hardware/`): 31 tests incl. 6GB laptop, 8GB, 24GB
+      workstation, multi-GPU, cgroup-limited, and no-GPU profiles
+- [x] Manual run on dev machine (RTX 3060 Laptop 6GB / 38GB RAM / NVMe) and
+      in Docker with `-m 6g` + bind-mounted `/mnt/nvme_cache`
+- Refinement: the KV-cache vs. hot-expert VRAM split moved to M2 — it needs
+  model sizes from the descriptor, so M1 outputs per-tier totals only
 
 ## M2 — Generic MoE descriptor + KTransformers bridge
 
@@ -39,6 +43,8 @@ summarized in `PROJECT_SCOPE.md`.
 - [ ] `engine/models/descriptor.py`: `MoEArchDescriptor` + per-family
       parsers + a generic fallback heuristic for untested architectures
 - [ ] Research KTransformers' injection-rule format from its source/docs
+- [ ] Model-aware VRAM placement: dense/attention/router weights first,
+      then KV cache, then hot experts, within the M1 VRAM budget
 - [ ] `engine/ktx_bridge/inject.py`: descriptor + M1 budget → injection
       rule set generator
 - [ ] Unit tests against 3 real downloaded `config.json` files
