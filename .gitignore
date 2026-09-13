@@ -22,14 +22,14 @@ htmlcov/
 *.bin
 *.pt
 *.pth
-models/
-weights/
+/models/
+/weights/
 .cache/
-huggingface/
-hf_cache/
+/huggingface/
+/hf_cache/
 
 # NVMe swap / runtime state
-nvme_cache/
+/nvme_cache/
 *.swap
 *.pagefile
 
