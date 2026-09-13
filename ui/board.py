@@ -58,7 +58,10 @@ def summary_sentence(plan: RunPlan) -> str:
     if not ram and not split:
         parts.append(f"All {total} layers fit on the GPU (fastest execution).")
     elif not gpu and not split:
-        parts.append(f"The experts of all {total} layers run from System RAM; GPU holds attention and KV cache.")
+        if plan.fit.gpu_layers:
+            parts.append(f"The experts of all {total} layers run from System RAM; GPU holds attention and KV cache.")
+        else:
+            parts.append(f"All {total} layers, including attention and the KV cache, run from System RAM (no GPU in use).")
     else:
         if gpu:
             parts.append(f"Layers {describe_ranges(gpu)} run in GPU VRAM.")
@@ -176,6 +179,9 @@ def _tiers(view: BoardView, gpu_parts: list[LayerPlacement], ram_parts: list[Lay
     layout = plan.layout if plan else None
     shared = _size(layout.total_bytes - layout.embedding_bytes - gpu_bytes - ram_bytes) if layout else UNKNOWN
     ctx = f"{plan.fit.context or layout.context_length:,} tokens" if plan else UNKNOWN
+    if plan and not plan.fit.gpu_layers:
+        # CPU-only: nothing is offloaded, so these live in RAM, not in this GPU tier.
+        shared, ctx = f"{shared} (in RAM)", f"{ctx} (in RAM)"
     gpu_layers = f"{describe_ranges([p.layer for p in gpu_parts])} ({_size(gpu_bytes)})" if gpu_parts else "none"
     ram_layers = f"{describe_ranges([p.layer for p in ram_parts])} ({_size(ram_bytes)})" if ram_parts else "none"
     model_name = plan.model_path.name if plan else UNKNOWN

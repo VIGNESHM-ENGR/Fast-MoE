@@ -47,4 +47,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Python dependencies trimmed to profiling, downloads and UI (no torch).
 
 ### Fixed
+- CPU-only placement no longer claims the GPU holds attention and the KV cache.
 - `.gitignore` no longer hides `engine/models/` and `tests/models/`.

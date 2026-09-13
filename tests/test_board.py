@@ -102,3 +102,11 @@ def test_chat_hud_shows_unknown_context_until_usage_arrives():
     assert "— / 8,192" in waiting
     done = render_chat_telemetry(state="completed", ctx_used=812, ctx_max=8192, speed_note="Measured by llama.cpp")
     assert "812 / 8,192" in done and "Measured by llama.cpp" in done
+
+
+def test_cpu_only_plan_does_not_claim_the_gpu_holds_anything():
+    cpu = replace(plan([], [], [0, 1, 2]), fit=parse_fit_args("-c 262144"))
+    assert "including attention and the KV cache, run from System RAM (no GPU in use)" in summary_sentence(cpu)
+    html = render_board(BoardView(state="unpowered", gpu_name=None, gpu_total=0, ram_total=38 * GiB, plan=cpu))
+    assert "GPU holds" not in html
+    assert "262,144 tokens (in RAM)" in html
