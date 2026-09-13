@@ -9,6 +9,8 @@ python -m engine.models.model_downloader --list          # show available quanti
 python -m engine.models.model_downloader --repo <hf-repo> --quant Q4_K_M
 ```
 
-Files land in `models/<repo-name>/`. Interrupted downloads resume where they
-stopped. Set `FAST_MOE_MODELS_DIR` to store models elsewhere (e.g. a bigger
+Files land in `models/<repo-name>/`. Finished files are never downloaded
+again, but an interrupted file starts over. If a download stalls, run it with
+`HF_HUB_DISABLE_XET=1` to use plain HTTPS instead of Hugging Face's Xet
+transfer. Set `FAST_MOE_MODELS_DIR` to store models elsewhere (e.g. a bigger
 NVMe drive).

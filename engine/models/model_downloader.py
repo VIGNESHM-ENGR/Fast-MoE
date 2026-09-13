@@ -2,8 +2,10 @@
 
 `python -m engine.models.model_downloader [--repo REPO] [--quant Q4_K_M] [--list]`
 
-Transfers go through `huggingface_hub`, which resumes interrupted downloads
-and skips files that are already complete. Multi-part GGUFs
+Transfers go through `huggingface_hub`, which skips files that are already
+complete. An interrupted file starts over (huggingface_hub 1.31 names each
+attempt's temp file differently). If Hugging Face's Xet transfer stalls, set
+`HF_HUB_DISABLE_XET=1` to download over plain HTTPS. Multi-part GGUFs
 (`*-00001-of-00003.gguf`) are fetched as a set; llama.cpp loads them from the
 first part.
 """
