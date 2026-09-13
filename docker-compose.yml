@@ -1,22 +1,21 @@
-# Zero-config runner: `docker compose up`. See TASKS.md milestone M7.
-#
-# GPU passthrough requires the NVIDIA Container Toolkit on the host.
-# For CPU-only hosts, run: docker compose --profile cpu up
+# Fast-MoE with an NVIDIA GPU: `docker compose up`, then open http://127.0.0.1:7860
+# Requires the NVIDIA Container Toolkit on the host. CPU-only hosts:
+#   docker compose -f docker-compose.cpu.yml up
 
 services:
-  fast-moe-gpu:
+  fast-moe:
     build:
       context: .
-      target: gpu
-    image: fast-moe:gpu
+      args:
+        BASE: ghcr.io/ggml-org/llama.cpp:server-cuda-b10920
+    image: fast-moe:cuda
+    # Run as the host user so models downloaded into ./models aren't owned by root.
+    user: "${FAST_MOE_UID:-1000}:${FAST_MOE_GID:-1000}"
     ports:
-      - "8000:8000" # OpenAI-compatible API
-      - "7860:7860" # Gradio UI
+      - "127.0.0.1:7860:7860"  # control panel
+      - "127.0.0.1:8080:8080"  # OpenAI-compatible API while a model is running
     volumes:
-      - /mnt/nvme_cache:/mnt/nvme_cache
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    environment:
-      - FAST_MOE_NVME_CACHE_DIR=/mnt/nvme_cache
+      - ./models:/models
     deploy:
       resources:
         reservations:
@@ -24,19 +23,4 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
-  fast-moe-cpu:
-    build:
-      context: .
-      target: cpu
-    image: fast-moe:cpu
-    profiles: ["cpu"]
-    ports:
-      - "8000:8000"
-      - "7860:7860"
-    volumes:
-      - /mnt/nvme_cache:/mnt/nvme_cache
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    environment:
-      - FAST_MOE_NVME_CACHE_DIR=/mnt/nvme_cache
-      - FAST_MOE_CPU_ONLY=1
+    restart: unless-stopped

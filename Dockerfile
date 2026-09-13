@@ -1,48 +1,48 @@
-# Multi-stage build for Fast-MoE. GPU-enabled by default; the `cpu` target
-# provides a CUDA-free fallback. See TASKS.md milestone M7 — this is
-# scaffolding only until M4 pins kt-kernel + sglang-kt and M2-M6 land
-# real engine code to install.
+# Fast-MoE on top of the official llama.cpp server image.
 #
-# Build:  docker build --target gpu -t fast-moe:gpu .
-#         docker build --target cpu -t fast-moe:cpu .
+# The control panel starts and restarts llama-server itself (with the placement
+# llama-fit-params computes), so both live in one image. BASE picks the backend:
+#   CUDA (default): ghcr.io/ggml-org/llama.cpp:server-cuda-b10920
+#   CPU:            ghcr.io/ggml-org/llama.cpp:server-b10920
+ARG BASE=ghcr.io/ggml-org/llama.cpp:server-cuda-b10920
+FROM ${BASE}
 
-# ---- builder (GPU): compiles KTransformers' CUDA/AMX extensions + Fast-MoE
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder-gpu
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.11 python3.11-dev python3-pip git build-essential ninja-build \
+# The base image has Python 3.12 but no venv/ensurepip.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /build
-COPY pyproject.toml README.md ./
+RUN python3 -m venv /opt/fast-moe
+ENV PATH=/opt/fast-moe/bin:$PATH
+
+WORKDIR /opt/fast-moe/src
+COPY pyproject.toml README.md LICENSE ./
 COPY engine ./engine
 COPY ui ./ui
+RUN pip install --no-cache-dir .
 
-# TODO(M7): install a pinned KTransformers commit/tag here (compiles its
-# CUDA/AMX extensions), then `pip install .`
+# fit-params ships as a subcommand of the image's `llama` tool; expose it under
+# the standalone name Fast-MoE looks up.
+RUN printf '#!/bin/sh\nexec /app/llama fit-params "$@"\n' > /usr/local/bin/llama-fit-params \
+    && chmod 755 /usr/local/bin/llama-fit-params
 
-# ---- runtime (GPU)
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS gpu
+# The llama.cpp binaries have no RPATH and only find their .so files next to them
+# via the library path, so make that work from any working directory.
+ENV LD_LIBRARY_PATH=/app:${LD_LIBRARY_PATH}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.11 python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+# Servers listen on all interfaces inside the container; compose publishes them on
+# 127.0.0.1 only. HOME=/tmp keeps logs writable when running as a non-root user.
+ENV LLAMA_CPP_BIN_DIR=/app \
+    FAST_MOE_MODELS_DIR=/models \
+    FAST_MOE_UI_HOST=0.0.0.0 \
+    FAST_MOE_API_HOST=0.0.0.0 \
+    HOME=/tmp \
+    PYTHONUNBUFFERED=1
 
-COPY --from=builder-gpu /build /app
-WORKDIR /app
+WORKDIR /opt/fast-moe
+EXPOSE 7860 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+    CMD curl -fsS http://127.0.0.1:7860/ >/dev/null || exit 1
 
-EXPOSE 8000 7860
-ENTRYPOINT ["python3", "-m", "engine.serve"]
-
-# ---- runtime (CPU-only fallback)
-FROM python:3.11-slim AS cpu
-
-WORKDIR /app
-COPY pyproject.toml README.md ./
-COPY engine ./engine
-COPY ui ./ui
-
-# TODO(M7): pip install .[cpu] once a CPU-only extra is defined
-
-EXPOSE 8000 7860
-ENTRYPOINT ["python3", "-m", "engine.serve"]
+ENTRYPOINT []
+CMD ["python", "-m", "ui.app"]

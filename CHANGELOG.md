@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Docker: one image on the pinned official llama.cpp server image with the
+  control panel inside. `docker compose up` (NVIDIA GPU) or
+  `docker compose -f docker-compose.cpu.yml up` (CPU only); ports are
+  published on localhost, `./models` is mounted, and the container runs as
+  the host user.
 - Gradio control panel (`python -m ui.app`): placement preview and start/stop,
   memory-tier and layer views built only from the real fit plan, live
   VRAM/RAM/throughput, chat with llama.cpp-measured speed and context use,

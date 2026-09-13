@@ -19,7 +19,7 @@ AVX-512), 38 GB RAM, NVMe SSD, running Qwen3-30B-A3B at Q4_K_M.
 | OpenAI-compatible API, metrics | `llama-server` (`/v1/chat/completions`, `/metrics`) | none |
 | Model downloads | `huggingface_hub` | quant selection, disk checks |
 | UI | Gradio | config, expert map, resources, chat |
-| Containers | official `ghcr.io/ggml-org/llama.cpp` images | compose file, UI image |
+| Containers | official `ghcr.io/ggml-org/llama.cpp` server images as the base | one image + compose files |
 | Hardware facts | NVML (`nvidia-ml-py`), `psutil` | cgroup-aware profile, tier budgets |
 
 ## In scope (v1)
@@ -28,7 +28,7 @@ AVX-512), 38 GB RAM, NVMe SSD, running Qwen3-30B-A3B at Q4_K_M.
 - Quantized GGUF models (Q4_K_M default); generic across MoE families
   llama.cpp supports (Qwen3-MoE, Mixtral, DeepSeek, ...).
 - Gradio UI: configuration, live expert-placement map, resource usage, chat.
-- Docker with NVIDIA GPU passthrough and a CPU-only profile.
+- Docker with NVIDIA GPU passthrough, and a CPU-only compose file.
 - Benchmarks against manual `--n-cpu-moe` tuning on the same hardware.
 
 ## Explicit non-goals (v1)

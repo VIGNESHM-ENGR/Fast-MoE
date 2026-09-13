@@ -107,11 +107,22 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 
 ## M7 — Docker
 
-- [ ] `docker-compose.yml`: official `ghcr.io/ggml-org/llama.cpp:server-cuda`
-      (GPU) or `:server` (CPU profile) + a slim Fast-MoE UI container
-- [ ] Host prerequisite documented: NVIDIA Container Toolkit
-- [ ] Verification: `docker compose up` and `docker compose --profile cpu up`
-      both reach a working API + UI with no manual flags
+- [x] One image on the pinned official llama.cpp server image
+      (`server-cuda-b10920`, CPU: `server-b10920`) plus Fast-MoE. The panel
+      starts and restarts llama-server with fitted arguments, so both live in
+      one container; `llama-fit-params` is a wrapper around `llama fit-params`
+- [x] `docker-compose.yml` (NVIDIA GPU) and `docker-compose.cpu.yml` (CPU
+      only): ports published on 127.0.0.1 only, `./models` mounted at
+      `/models`, runs as the host user so downloads aren't root-owned
+- [x] Host prerequisite documented: NVIDIA Container Toolkit
+- [x] Found and fixed: the base image's binaries have no RPATH, so
+      `LD_LIBRARY_PATH` must include `/app` when started from another directory
+- [x] GPU stack verified on the RTX 3060 Laptop with Qwen3.6-35B-A3B: same
+      placement as native (0-3 GPU, 4 split, 5-39 RAM), live in 19 s, host
+      reaches the API on 127.0.0.1:8080, 18.1 tok/s (native: 18.3)
+- [x] CPU stack verified: all 40 layers in RAM, 262,144-token context, live
+      in 54 s, 3.9 tok/s decode / 7.2 tok/s prompt on the first request
+- [ ] Publish images to a registry (ghcr.io) from CI
 
 ## M8 — Benchmarks
 
@@ -158,6 +169,11 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 - Fast-MoE = model downloader + launcher/supervisor + Gradio config and
   expert-placement visualization + compose file. KTransformers is an optional
   later backend for AMX / high-RAM machines.
+
+**2026-09-13 — M7: one container instead of UI + server containers**
+- The panel restarts llama-server with new fitted arguments; controlling a
+  second container would mean mounting the Docker socket into the UI. One
+  image built on the official llama.cpp image keeps the native code path.
 
 **2026-09-13 — during M5: target model is Qwen3.6-35B-A3B**
 - The user asked for Qwen3.6 from the start; the plan wrongly assumed it did

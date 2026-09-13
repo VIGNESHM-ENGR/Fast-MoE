@@ -82,9 +82,33 @@ pytest
 
 CI runs the same lint and tests on every push and pull request.
 
+### Docker
+
+```bash
+docker compose up                              # NVIDIA GPU
+docker compose -f docker-compose.cpu.yml up    # no GPU
+```
+
+Then open http://127.0.0.1:7860. Models live in `./models` on the host, and
+the OpenAI-compatible API is on http://127.0.0.1:8080/v1 while a model is
+running. Both ports are published on localhost only.
+
+The GPU setup needs the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the host. On Ubuntu, after adding NVIDIA's apt repository:
+
+```bash
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+The container runs as UID/GID 1000 so downloaded models belong to you; set
+`FAST_MOE_UID` / `FAST_MOE_GID` if your user differs.
+
 ## Coming next
 
-`docker compose up` and benchmarks. Track progress in [TASKS.md](TASKS.md).
+Benchmarks against manual llama.cpp tuning. Track progress in [TASKS.md](TASKS.md).
 
 ## Credits
 

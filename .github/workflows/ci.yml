@@ -44,3 +44,18 @@ jobs:
       # No GPU, llama.cpp build or model downloads are needed: tests use mocks and fixtures.
       - name: Pytest
         run: python -m pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The CPU variant builds from the same Dockerfile and needs no GPU runner.
+      - name: Build CPU image
+        run: docker build --build-arg BASE=ghcr.io/ggml-org/llama.cpp:server-b10920 -t fast-moe:cpu .
+      - name: Smoke test
+        # Run from / to catch library-path regressions: the base image's binaries have no RPATH.
+        run: >-
+          docker run --rm --user 1000:1000 fast-moe:cpu sh -c
+          'cd / && /app/llama-server --version && llama-fit-params --help > /dev/null
+          && python -c "import ui.app; from engine.llama.server import find_binary;
+          print(find_binary(\"llama-server\"), find_binary(\"llama-fit-params\"))"'
