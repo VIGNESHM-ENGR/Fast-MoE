@@ -37,17 +37,24 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 - [x] `engine/models/model_downloader.py` on `huggingface_hub`: exact quant
       matching, multi-part GGUF sets, disk-space check, resume, `--list`
 - [x] `models/` folder (git-ignored except its README)
-- [ ] Qwen3-30B-A3B Q4_K_M (17.3 GiB) downloaded on the dev machine
+- [x] Qwen3-30B-A3B Q4_K_M downloaded on the dev machine (18,556,685,824 bytes,
+      matches Hugging Face)
 
 ## M4 — First run on the dev machine
 
 - [x] `scripts/build_llama_cpp.sh`: native CUDA build pinned to llama.cpp `b10937`
-- [ ] Native build succeeds (CUDA 13.4 toolkit, driver 595.84)
-- [ ] `llama-server -m models/Qwen3-30B-A3B-GGUF/Qwen3-30B-A3B-Q4_K_M.gguf`
-      with default `--fit on`: record which expert tensors it put on CPU and
-      the context size it chose
-- [ ] OpenAI Python client round-trip, incl. streaming
-- [ ] Record prompt/decode tok/s as the first baseline
+- [x] Native build succeeds (CUDA 13.4 toolkit on driver 595.84 / CUDA 13.2)
+- [x] `llama-server -m models/Qwen3-30B-A3B-GGUF/Qwen3-30B-A3B-Q4_K_M.gguf --jinja`
+      with default `--fit on`: loads in 9.5 s, 4 slots × 4096 ctx, 6 threads,
+      expert tensors overridden to CPU (mmap)
+- [x] Memory: 4.8 / 6.0 GiB VRAM; server RSS 18.4 GiB of which 18.1 GiB is the
+      memory-mapped GGUF (page cache over NVMe) and 0.37 GiB anonymous
+- [x] OpenAI Python client round-trip incl. streaming (TTFT 1.7 s)
+- [x] First baseline: decode 16.3 tok/s, prompt 25.6 tok/s (26-token prompt)
+- [ ] Capture the exact `--fit` placement (per-layer experts on CPU) — not
+      printed at default verbosity; try `-lv 4` / `llama-fit-params`
+- [ ] Try `--parallel 1` (one user gets the whole context) and
+      `--load-mode none` (llama.cpp suggests it beats mmap with CPU experts)
 
 ## M5 — `python -m engine.serve` (launcher & supervisor)
 
