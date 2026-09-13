@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fast-moe"
+version = "0.1.0"
+description = "Tiered VRAM/RAM/NVMe inference engine for Mixture-of-Experts LLMs on consumer hardware"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.3",
+    "safetensors>=0.4",
+    "pyyaml>=6.0",
+    "psutil>=5.9",
+    "pynvml>=11.5",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "gradio>=4.30",
+    "pydantic>=2.6",
+    # ktransformers is built from source in the Docker image (see Dockerfile);
+    # pin an exact commit/tag once M2 selects one.
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.14",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+fast-moe = "engine.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["engine*", "ui*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

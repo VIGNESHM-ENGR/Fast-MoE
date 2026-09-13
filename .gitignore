@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+
+# Testing / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Model weights / caches (never commit these)
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+models/
+weights/
+.cache/
+huggingface/
+hf_cache/
+
+# NVMe swap / runtime state
+nvme_cache/
+*.swap
+*.pagefile
+
+# CUDA / native build artifacts
+*.so
+*.o
+*.obj
+third_party/build/
+CMakeCache.txt
+CMakeFiles/
+
+# Logs
+*.log
+logs/
+
+# Env / secrets
+.env
+.env.*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

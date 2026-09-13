@@ -1,0 +1,25 @@
+# Default Fast-MoE configuration.
+# Every value here is an override; leaving a field null (the default) means
+# "auto-detect via engine/hardware/profiler.py + allocator.py" — the whole
+# point of the zero-config runner. See PROJECT_SCOPE.md and TASKS.md M1.
+
+model:
+  hf_path: null # e.g. "Qwen/Qwen3-30B-A3B"
+  quantization: null # null = auto-select (INT4/INT8/GGUF); see TASKS.md M3
+
+hardware:
+  vram_reserve_fraction: 0.15 # headroom for activations/workspace
+  nvme_cache_dir: null # e.g. "/mnt/nvme_cache"; null = auto-detect fastest local mount
+  cpu_only: false
+
+memory:
+  kv_block_size: null # tokens per KV page; null = auto-tuned (M4)
+  eviction_policy: lru # lru | decay (see engine/memory/evictor.py)
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+ui:
+  host: "0.0.0.0"
+  port: 7860
