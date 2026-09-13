@@ -19,8 +19,7 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "gradio>=4.30",
     "pydantic>=2.6",
-    # ktransformers is built from source in the Docker image (see Dockerfile);
-    # pin an exact commit/tag once M2 selects one.
+    # kt-kernel + sglang-kt (the KTransformers runtime) get pinned in TASKS.md M4.
 ]
 
 [project.optional-dependencies]
@@ -31,7 +30,7 @@ dev = [
 ]
 
 [project.scripts]
-fast-moe = "engine.cli:main"
+fast-moe = "engine.serve:main"
 
 [tool.setuptools.packages.find]
 include = ["engine*", "ui*"]

@@ -1,6 +1,6 @@
 # Multi-stage build for Fast-MoE. GPU-enabled by default; the `cpu` target
-# provides a CUDA-free fallback. See TASKS.md milestone M9 — this is
-# scaffolding only until M2/M3 pin an exact KTransformers ref and M1-M8 land
+# provides a CUDA-free fallback. See TASKS.md milestone M7 — this is
+# scaffolding only until M4 pins kt-kernel + sglang-kt and M2-M6 land
 # real engine code to install.
 #
 # Build:  docker build --target gpu -t fast-moe:gpu .
@@ -18,7 +18,7 @@ COPY pyproject.toml README.md ./
 COPY engine ./engine
 COPY ui ./ui
 
-# TODO(M9): install a pinned KTransformers commit/tag here (compiles its
+# TODO(M7): install a pinned KTransformers commit/tag here (compiles its
 # CUDA/AMX extensions), then `pip install .`
 
 # ---- runtime (GPU)
@@ -32,7 +32,7 @@ COPY --from=builder-gpu /build /app
 WORKDIR /app
 
 EXPOSE 8000 7860
-ENTRYPOINT ["python3", "-m", "engine.cli"]
+ENTRYPOINT ["python3", "-m", "engine.serve"]
 
 # ---- runtime (CPU-only fallback)
 FROM python:3.11-slim AS cpu
@@ -42,7 +42,7 @@ COPY pyproject.toml README.md ./
 COPY engine ./engine
 COPY ui ./ui
 
-# TODO(M9): pip install .[cpu] once a CPU-only extra is defined
+# TODO(M7): pip install .[cpu] once a CPU-only extra is defined
 
 EXPOSE 8000 7860
-ENTRYPOINT ["python3", "-m", "engine.cli"]
+ENTRYPOINT ["python3", "-m", "engine.serve"]

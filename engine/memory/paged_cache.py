@@ -2,5 +2,5 @@
 fixed-size KV blocks, non-contiguous physical allocation, per-sequence
 block tables.
 
-See TASKS.md milestone M4.
+See TASKS.md milestone M8 (built only where upstream sglang-kt falls short).
 """

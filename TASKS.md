@@ -1,9 +1,8 @@
 # Tasks
 
-Living, milestone-grouped task list. Check items off as they land. Each
-milestone's design rationale and citations live in the approved plan
-(`.claude/plans/you-are-an-expert-quiet-reef.md` in this session) and are
-summarized in `PROJECT_SCOPE.md`.
+Living, milestone-grouped task list. Check items off as they land. Scope and
+non-goals live in `PROJECT_SCOPE.md`; decisions that changed the plan are
+logged at the bottom of this file.
 
 ## M0 — Repo scaffolding & docs
 
@@ -13,7 +12,7 @@ summarized in `PROJECT_SCOPE.md`.
 - [x] `pyproject.toml` skeleton (deps, `fast-moe` console script)
 - [x] Full package/directory skeleton with docstring-only stub modules
 - [x] `configs/default_config.yaml`
-- [x] `Dockerfile`, `docker-compose.yml` skeletons (real content in M9)
+- [x] `Dockerfile`, `docker-compose.yml` skeletons
 - [x] `README.md`, `PROJECT_SCOPE.md`, `CHANGELOG.md`, `TASKS.md`
 - [x] First commit (no co-author/attribution line, per project convention)
 
@@ -33,94 +32,120 @@ summarized in `PROJECT_SCOPE.md`.
       workstation, multi-GPU, cgroup-limited, and no-GPU profiles
 - [x] Manual run on dev machine (RTX 3060 Laptop 6GB / 38GB RAM / NVMe) and
       in Docker with `-m 6g` + bind-mounted `/mnt/nvme_cache`
-- Refinement: the KV-cache vs. hot-expert VRAM split moved to M2 — it needs
-  model sizes from the descriptor, so M1 outputs per-tier totals only
 
-## M2 — Generic MoE descriptor + KTransformers bridge
+## M2 — Generic MoE descriptor + model-aware launch plan
 
-- [ ] Research: diff `config.json` schemas across Qwen3-MoE, Mixtral,
-      DeepSeek-V2/V3 (expert-count/top-k field names are not uniform)
+Turns "a HF model id + the M1 budget" into a complete, explained set of
+`sglang-kt` launch flags. Pure functions, fully unit-testable without a GPU.
+
+- [ ] Research: diff `config.json` fields across Qwen3-MoE, Mixtral,
+      DeepSeek-V2/V3 (`num_experts` vs `num_local_experts` vs
+      `n_routed_experts`, shared experts, MLA vs GQA attention)
 - [ ] `engine/models/descriptor.py`: `MoEArchDescriptor` + per-family
-      parsers + a generic fallback heuristic for untested architectures
-- [ ] Research KTransformers' injection-rule format from its source/docs
-- [ ] Model-aware VRAM placement: dense/attention/router weights first,
-      then KV cache, then hot experts, within the M1 VRAM budget
-- [ ] `engine/ktx_bridge/inject.py`: descriptor + M1 budget → injection
-      rule set generator
-- [ ] Unit tests against 3 real downloaded `config.json` files
-- [ ] Integration test: generated rules load first N layers of each model
-      family under KTransformers with no manual edits
+      parsers; fail loudly on unknown architectures instead of guessing
+- [ ] Size model: non-expert weight bytes, per-expert bytes at a given
+      quantization, per-token KV cache bytes (GQA and MLA formulas)
+- [ ] Add CPU instruction-set + physical-core detection to the profiler
+      (needed for `--kt-method` and `--kt-cpuinfer`)
+- [ ] `engine/ktx_bridge/launch_plan.py`: budget + descriptor → flags —
+      `--kt-method` (LLAMAFILE first), `--kt-cpuinfer` (physical cores),
+      `--kt-threadpool-count` (NUMA nodes), `--kt-num-gpu-experts`,
+      `--mem-fraction-static`, context length from leftover VRAM for KV,
+      `--chunked-prefill-size`; placement priority: dense weights → KV
+      cache → hot experts
+- [ ] Every derived flag carries a human-readable reason (feeds the UI)
+- [ ] Unit tests: real `config.json` fixtures for Qwen3-30B-A3B, Mixtral
+      8x7B, DeepSeek-V2-Lite × the synthetic hardware profiles from M1
 
-## M3 — Quantized weight loading
+## M3 — Weight acquisition
 
-- [ ] Research KTransformers' supported quantized-expert formats
-      (INT4/INT8/GPTQ/FP8) and expected on-disk layout
-- [ ] `engine/models/loader.py`: safetensors path for shared/attention
-      layers; quantized routed-expert path via KTransformers' kernels
-- [ ] `engine/models/loader.py`: GGUF as an alternate source format
-- [ ] Verification: forward pass on Qwen3-30B-A3B quantized experts;
-      logits/perplexity compared against an HF `transformers` fp16
-      reference within an agreed tolerance
+- [ ] Download GGUF experts (e.g. `Qwen/Qwen3-30B-A3B-GGUF` Q4_K_M) into
+      the cold-tier directory, with disk-space check against the M1 budget
+- [ ] Research: does `sglang-kt` need expert tensors present in `--model`
+      when experts run on CPU? If not, fetch only non-expert tensors
+      (~3 GB instead of ~61 GB) using safetensors headers + HTTP range
+      requests; otherwise download the full checkpoint
+- [ ] Resumable downloads + integrity check; progress events for the UI
 
-## M4 — Paged KV cache manager
+## M4 — Launcher & supervisor (`python -m engine.serve --model <id>`)
 
-- [ ] Re-read vLLM PagedAttention (arXiv:2309.06180) block-table design
-- [ ] `engine/memory/paged_cache.py`: fixed-size block allocator, free
-      list, per-sequence block table
-- [ ] Unit tests (`tests/memory/`): allocate/free/fragmentation behavior
-- [ ] Integration test: long sequence forcing block reuse, output-identical
-      to a non-paged reference implementation
+- [ ] Pin `kt-kernel` + `sglang-kt` versions; install path documented
+- [ ] `engine/serve.py`: profile → plan → fetch weights → spawn
+      `sglang.launch_server`, capture logs, health-check, graceful shutdown
+- [ ] Clear error messages for the known failure modes (OOM at load, CUDA
+      compute capability < 8.0, missing AVX2)
+- [ ] Verification: Qwen3-30B-A3B serving on the RTX 3060 Laptop 6 GB dev
+      machine; `openai` Python client round-trip incl. streaming
 
-## M5 — Tiered swap backend + evictor
+## M5 — Baseline benchmarks
 
-- [ ] Research task: benchmark `io_uring` Python bindings vs.
-      `mmap`+`madvise` vs. a thread-pool executor on the target NVMe;
-      pick the backend by measured throughput/latency, not by assumption
-- [ ] `engine/memory/swap_backend.py`: VRAM↔RAM via CUDA-stream
-      non-blocking copies; RAM↔NVMe via the chosen async I/O backend
-- [ ] `engine/memory/evictor.py`: LRU and token-decay eviction policies
-- [ ] Microbenchmark: decode throughput doesn't cliff when cold blocks are
-      touched, vs. a synchronous-copy baseline
+- [ ] `benchmarks/bench_throughput.py`: prefill tok/s, decode tok/s, TTFT
+      at several context lengths via the OpenAI API
+- [ ] Same model/quant/hardware under llama.cpp `--n-cpu-moe` as the
+      baseline; record both in `benchmarks/results/`
+- [ ] Measure what `--kt-max-deferred-experts-per-token` and GPU expert
+      count actually buy on 6 GB, to tune the M2 defaults with data
 
-## M6 — Route-aware expert prefetcher
+## M6 — Gradio UI (designed with the impeccable skill)
 
-- [ ] Re-read PreScope (arXiv:2509.23638) prefetch-triggering approach
-- [ ] `engine/models/moe_router.py`: capture early-layer routing
-      decisions, issue async prefetch for predicted downstream experts
-- [ ] Benchmark: prefetch hit rate + decode throughput improvement vs. M5
-      without prefetching, same hardware
+- [ ] Metrics source: NVML + psutil tier usage, SGLang `/metrics`, and
+      `--record-kt-gpu-expert-distribution` stats
+- [ ] Config panel: model picker, VRAM/RAM/disk caps → re-plan with
+      reasons shown → restart server
+- [ ] Memory-map view: every layer × expert, colored by tier (GPU / RAM /
+      NVMe), sized/heat-mapped by activation frequency
+- [ ] Resource view: per-tier utilization, throughput, KV cache usage
+- [ ] Chat panel wired to the local OpenAI endpoint
+- [ ] Browser walkthrough during a live generation
 
-## M7 — OpenAI-compatible API server
+## M7 — Docker packaging
 
-- [ ] `engine/api/schemas.py`: OpenAI-compatible request/response models
-- [ ] `engine/api/server.py`: `/v1/chat/completions` incl. streaming
-- [ ] `engine/cli.py`: `python -m engine.cli --model <hf_path>` wiring
-      M1-M6 with zero manual flags
-- [ ] Verification: `curl` / `openai` Python client round-trip
+- [ ] Multi-stage `Dockerfile` (CUDA 12.x devel builder → runtime) with
+      pinned `kt-kernel` / `sglang-kt`
+- [ ] Research the CPU-only fallback: `sglang-kt` assumes a GPU, so pick a
+      CPU runtime (SGLang CPU backend or llama.cpp) and route to it
+- [ ] `docker-compose.yml`: GPU passthrough, NVMe + HF cache bind mounts,
+      UI and API ports
+- [ ] Verification: `docker compose up` on the dev machine and CPU-only
+      profile both reach a working API + UI with no manual flags
 
-## M8 — Gradio UI
+## M8 — NVMe cold tier for experts (upstream gap)
 
-- [ ] `ui/state.py`: polling client for the engine's metrics endpoint
-- [ ] `ui/panels/config_panel.py`: model picker + VRAM/RAM/NVMe override
-      sliders
-- [ ] `ui/panels/memory_map_panel.py`: live per-tier expert/KV-block map
-      + utilization bars
-- [ ] `ui/app.py`: mounts both panels
-- [ ] Manual browser walkthrough during a live multi-turn generation
+- [ ] Research: does kt-kernel's LLAMAFILE backend mmap GGUF (letting the
+      OS page cache already act as the RAM↔NVMe tier) or copy into RAM?
+      Measure RSS and page faults with a model larger than RAM
+- [ ] If needed: cap resident expert memory and page cold experts from
+      NVMe with an LRU/decay evictor (`engine/memory/`), MoE-Infinity-style
+- [ ] Benchmark a model that does not fit in RAM (e.g. Qwen3-235B-A22B
+      GGUF) against the M5 baseline
 
-## M9 — Docker packaging
+## M9 — Route-aware expert prefetch (research milestone)
 
-- [ ] Pin an exact KTransformers commit/tag; wire its build into the
-      `Dockerfile` GPU builder stage
-- [ ] Define a CPU-only install path; complete the `Dockerfile` `cpu` target
-- [ ] Verification: `docker compose up` (GPU box) and
-      `docker compose --profile cpu up` (CPU box) both reach a working
-      API + Gradio UI with no manual flags
+- [ ] Measure cross-layer routing predictability on Qwen3-30B-A3B from
+      recorded expert distributions (PreScope, arXiv:2509.23638)
+- [ ] Prototype prefetch of predicted experts into RAM/GPU, either as a
+      `sglang-kt` patch or a direct `KTMoEWrapper` engine loop
+- [ ] Keep only if it beats M5/M8 numbers on the same hardware
 
-## M10 — Benchmarks, README, open-source polish
+## M10 — Release polish
 
-- [ ] `benchmarks/bench_throughput.py`: Fast-MoE vs. llama.cpp
-      `--n-cpu-moe` baseline, same hardware/model
-- [ ] Record real numbers in `README.md`
+- [ ] README: architecture diagram, benchmark table, quickstart, UI screenshots
 - [ ] `CHANGELOG.md` `v0.1.0` entry
-- [ ] Verify README benchmark numbers are reproducible from a clean checkout
+- [ ] Verify README numbers reproduce from a clean checkout
+
+---
+
+## Plan revisions
+
+**2026-09-13 — after M1**
+- KTransformers archived its YAML injection-rule framework; it now ships as
+  `kt-kernel` inside the `sglang-kt` SGLang fork, which already provides a
+  paged KV cache, CPU/disk KV offload, an OpenAI API and GPU-expert
+  placement. Fast-MoE becomes an **orchestrator first** (auto-derived flags,
+  weights, supervision, UI, Docker). Own memory/prefetch code is built only
+  where upstream lacks it (M8, M9).
+- v1 VRAM floor lowered from 8 GB to **6 GB**; the RTX 3060 Laptop dev
+  machine is the reference test box.
+- First weight path is **GGUF via the LLAMAFILE backend** (no conversion,
+  runs on any AVX2 CPU).
+- KV-cache vs. hot-expert VRAM split moved from M1 to M2 (needs model sizes).

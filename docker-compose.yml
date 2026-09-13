@@ -1,4 +1,4 @@
-# Zero-config runner: `docker compose up`. See TASKS.md milestone M9.
+# Zero-config runner: `docker compose up`. See TASKS.md milestone M7.
 #
 # GPU passthrough requires the NVIDIA Container Toolkit on the host.
 # For CPU-only hosts, run: docker compose --profile cpu up
