@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Gradio control panel (`python -m ui.app`): placement preview and start/stop,
+  memory-tier and layer views built only from the real fit plan, live
+  VRAM/RAM/throughput, chat with llama.cpp-measured speed and context use,
+  hardware profile, and server logs.
 - `python -m engine.serve`: one-command launcher. Downloads the model if
   needed, runs llama.cpp's `llama-fit-params`, prints which layers' experts
   sit on the GPU, split, or in RAM (with sizes, from GGUF metadata), then

@@ -61,10 +61,20 @@ context, move more experts to RAM), `--no-mmap`, and any `llama-server` flag
 after `--`. Other tools: `python -m engine.hardware` (hardware profile),
 `python -m engine.models.model_downloader --list` (available quantizations).
 
+### Control panel
+
+```bash
+python -m ui.app                  # then open http://127.0.0.1:7860
+```
+
+Preview where a model will live before starting it, apply settings, chat,
+and watch VRAM, RAM and tokens/s. On the RTX 3060 Laptop (6 GB) Qwen3.6-35B-A3B
+keeps layers 0-3 on the GPU, splits layer 4 and runs layers 5-39 from RAM,
+answering at about 18 tokens/s.
+
 ## Coming next
 
-The Gradio UI with the live expert map, and `docker compose up`. Track
-progress in [TASKS.md](TASKS.md).
+`docker compose up` and benchmarks. Track progress in [TASKS.md](TASKS.md).
 
 ## Credits
 

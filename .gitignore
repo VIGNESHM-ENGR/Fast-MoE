@@ -50,6 +50,9 @@ logs/
 .env
 .env.*
 
+# Local design-tool workspace (screenshots, briefs)
+.impeccable/
+
 # IDE / OS
 .vscode/
 .idea/

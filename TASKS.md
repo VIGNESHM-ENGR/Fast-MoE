@@ -77,20 +77,33 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
       `--ctx`, `--vram-margin-mib`, `--no-mmap`, passthrough after `--`
 - [x] Health check, log file under `~/.cache/fast-moe/logs/`, Ctrl+C stops
       the server (verified: 2 s), clear errors for missing binary/model and busy port
-- [ ] Verify on Qwen3.6-35B-A3B once downloaded; pick the default `--ctx`
-      for it from measurements (its KV cache is ~4x smaller per token)
-- [ ] Restart with new settings without exiting (needed by the UI, M6)
+- [x] Verified on Qwen3.6-35B-A3B through the UI (see M6)
+- [x] Restart with new settings without exiting: `Runner.launch(plan)` after a
+      fit made with no server running (a running server would skew free VRAM)
+- [ ] Pick the default `--ctx` for Qwen3.6 from measurements (its KV cache is
+      ~4x smaller per token)
 
-## M6 — Gradio UI (designed with the impeccable skill)
+## M6 — Gradio UI
 
-- [ ] Model panel: pick/download a GGUF with progress
-- [ ] Config panel: context length, VRAM margin, RAM cap, CPU threads →
-      restart server, show the resulting launch command
-- [ ] Expert map: every layer × expert colored by where it lives (GPU / RAM /
-      disk via mmap), sized by bytes
-- [ ] Resources: VRAM / RAM / disk usage, tok/s and KV usage from `/metrics`
-- [ ] Chat panel wired to the local OpenAI endpoint
-- [ ] Browser walkthrough during a live generation
+- [x] `python -m ui.app` on http://127.0.0.1:7860: tabs for Engine & Memory
+      Topology, Chat Studio, Hardware & Benchmarks, Engine Logs
+- [x] Config panel: model, context length, VRAM margin, mmap → Preview
+      Placement (no server needed) or Apply & Start; shows the exact
+      `llama-server` command
+- [x] Placement view from the real plan: explainer cards, GPU / RAM / disk
+      tiers, per-layer GPU cards, full layer matrix, plain-language summary,
+      layers moved off the GPU vs. the previous plan
+- [x] Resources: VRAM (NVML), RAM (psutil), prompt/generation tok/s from
+      `/metrics`
+- [x] Chat with reasoning folded into a "Thinking" section; TTFT and phase
+      timers, generation speed and context use taken from llama-server's
+      own `timings` and `usage`
+- [x] Browser walkthrough with Qwen3.6-35B-A3B on the RTX 3060 Laptop:
+      layers 0-3 on GPU, 4 split, 5-39 in RAM at 4K context; live in 19 s;
+      550-token answer at 18.3 tok/s (measured by llama.cpp); no page errors
+- [ ] Per-expert activity (which experts fire): needs routing statistics
+      llama.cpp does not expose yet
+- [ ] Model download with progress from the UI
 
 ## M7 — Docker
 

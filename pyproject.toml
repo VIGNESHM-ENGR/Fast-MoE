@@ -15,7 +15,8 @@ dependencies = [
     "pyyaml>=6.0",
     "huggingface_hub>=1.0",
     "gguf>=0.17",  # llama.cpp's GGUF reader, for tensor names and sizes
-    "gradio>=5.0",
+    "gradio>=6.0",  # app-level css/theme are launch() arguments since 6.0
+    "openai>=1.40",  # chat panel talks to llama-server's OpenAI-compatible API
     # Inference runs in llama.cpp's llama-server (native build or official Docker image), not in Python.
 ]
 
@@ -31,6 +32,9 @@ fast-moe = "engine.serve:main"
 
 [tool.setuptools.packages.find]
 include = ["engine*", "ui*"]
+
+[tool.setuptools.package-data]
+ui = ["assets/*.css", "assets/fonts/*"]
 
 [tool.ruff]
 line-length = 100
