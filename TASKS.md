@@ -122,7 +122,7 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
       reaches the API on 127.0.0.1:8080, 18.1 tok/s (native: 18.3)
 - [x] CPU stack verified: all 40 layers in RAM, 262,144-token context, live
       in 54 s, 3.9 tok/s decode / 7.2 tok/s prompt on the first request
-- [ ] Publish images to a registry (ghcr.io) from CI
+- Not planned: publishing images to a registry. Users build locally with `docker compose up`.
 
 ## M8 — Benchmarks
 

@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `scripts/build_llama_cpp.sh`: native CUDA build of a pinned llama.cpp release.
 
 ### Changed
+- README rewritten for engineers and non-technical readers, with dashboard
+  screenshots and measured results.
 - Inference runtime is llama.cpp's `llama-server` (Q4 GGUF only, automatic
   CPU/GPU expert placement with `--fit`). The earlier KTransformers /
   sglang-kt direction needed full-precision checkpoints; its launch planner is
@@ -52,5 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Python dependencies trimmed to profiling, downloads and UI (no torch).
 
 ### Fixed
+- The hardware tab no longer shows "nvme" when the drive type is unknown, and
+  the Docker image measures the cold tier on the mounted `/models` drive.
 - CPU-only placement no longer claims the GPU holds attention and the KV cache.
 - `.gitignore` no longer hides `engine/models/` and `tests/models/`.
