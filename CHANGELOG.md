@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `python -m engine.serve`: one-command launcher. Downloads the model if
+  needed, runs llama.cpp's `llama-fit-params`, prints which layers' experts
+  sit on the GPU, split, or in RAM (with sizes, from GGUF metadata), then
+  starts and supervises `llama-server` with exactly those arguments.
 - Repository scaffolding: package layout (`engine/`, `ui/`, `configs/`,
   `benchmarks/`, `tests/`), `pyproject.toml`, `Dockerfile` /
   `docker-compose.yml` skeletons, `.gitignore`, `.dockerignore`,
@@ -33,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   sglang-kt direction needed full-precision checkpoints; its launch planner is
   kept in `engine/ktx_bridge/` for a possible later backend.
 - Minimum VRAM target lowered to 6 GB.
+- Default model is Qwen3.6-35B-A3B (`ggml-org/Qwen3.6-35B-A3B-GGUF`, Q4_K_M).
 - Python dependencies trimmed to profiling, downloads and UI (no torch).
 
 ### Fixed

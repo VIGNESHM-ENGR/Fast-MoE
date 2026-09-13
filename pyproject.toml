@@ -14,6 +14,7 @@ dependencies = [
     "nvidia-ml-py>=12.535",  # official NVML bindings; the `pynvml` PyPI package is deprecated
     "pyyaml>=6.0",
     "huggingface_hub>=1.0",
+    "gguf>=0.17",  # llama.cpp's GGUF reader, for tensor names and sizes
     "gradio>=5.0",
     # Inference runs in llama.cpp's llama-server (native build or official Docker image), not in Python.
 ]

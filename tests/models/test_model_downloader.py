@@ -41,6 +41,17 @@ def test_quant_names_for_error_message():
     assert dl.quant_names(FILES) == ["Q4_K", "Q4_K_M", "Q4_K_S", "Q8_0"]
 
 
+def test_local_model_skips_projectors_and_picks_first_part(tmp_path):
+    repo = tmp_path / "Big-GGUF"
+    (repo / "Q4_K_M").mkdir(parents=True)
+    for name in ("mmproj-Big-Q4_K_M.gguf", "Q4_K_M/Big-Q4_K_M-00002-of-00002.gguf",
+                 "Q4_K_M/Big-Q4_K_M-00001-of-00002.gguf"):
+        (repo / name).write_bytes(b"x")
+    assert dl.local_model("org/Big-GGUF", "Q4_K_M", tmp_path) == repo / "Q4_K_M/Big-Q4_K_M-00001-of-00002.gguf"
+    assert dl.local_model("org/Big-GGUF", "Q8_0", tmp_path) is None
+    assert dl.local_model("org/Missing", "Q4_K_M", tmp_path) is None
+
+
 def test_complete_files_are_not_counted_again(tmp_path):
     files = {"a.gguf": 100, "b.gguf": 200}
     (tmp_path / "a.gguf").write_bytes(b"x" * 100)

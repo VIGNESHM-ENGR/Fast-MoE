@@ -18,7 +18,8 @@ from pathlib import Path
 
 from huggingface_hub import HfApi, hf_hub_download
 
-DEFAULT_REPO = "Qwen/Qwen3-30B-A3B-GGUF"
+# Published by the llama.cpp maintainers; Qwen does not ship an official GGUF for Qwen3.6.
+DEFAULT_REPO = "ggml-org/Qwen3.6-35B-A3B-GGUF"
 DEFAULT_QUANT = "Q4_K_M"
 MODELS_DIR_ENV = "FAST_MOE_MODELS_DIR"
 DISK_HEADROOM_BYTES = 5 * 1024**3
@@ -56,10 +57,24 @@ def bytes_still_needed(dest: Path, files: dict[str, int]) -> int:
                if not ((dest / name).exists() and (dest / name).stat().st_size == size))
 
 
+def local_model(repo_id: str, quant: str, root: Path | None = None) -> Path | None:
+    """Already-downloaded GGUF for this repo and quant (first part of a multi-part set)."""
+    dest = (root or models_dir()) / repo_id.split("/")[-1]
+    if not dest.is_dir():
+        return None
+    files = {str(p.relative_to(dest)): p.stat().st_size for p in dest.rglob("*.gguf")
+             if ".cache" not in p.parts}
+    matches = sorted(n for n in select_quant(files, quant)
+                     if not Path(n).name.startswith(("mmproj", "mtp", "dflash")))
+    return dest / matches[0] if matches else None
+
+
 def download(repo_id: str = DEFAULT_REPO, quant: str = DEFAULT_QUANT, root: Path | None = None,
              api: HfApi | None = None) -> list[Path]:
     available = list_gguf_files(repo_id, api)
-    files = select_quant(available, quant)
+    # Vision projectors and speculative-decoding drafts share the quant name but aren't the model.
+    files = {n: s for n, s in select_quant(available, quant).items()
+             if not Path(n).name.startswith(("mmproj", "mtp", "dflash"))}
     if not files:
         raise SystemExit(f"No {quant} GGUF in {repo_id}. Available: {', '.join(quant_names(available))}")
 

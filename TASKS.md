@@ -51,21 +51,35 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
       memory-mapped GGUF (page cache over NVMe) and 0.37 GiB anonymous
 - [x] OpenAI Python client round-trip incl. streaming (TTFT 1.7 s)
 - [x] First baseline: decode 16.3 tok/s, prompt 25.6 tok/s (26-token prompt)
-- [ ] Capture the exact `--fit` placement (per-layer experts on CPU) — not
-      printed at default verbosity; try `-lv 4` / `llama-fit-params`
-- [ ] Try `--parallel 1` (one user gets the whole context) and
-      `--load-mode none` (llama.cpp suggests it beats mmap with CPU experts)
+- [x] Exact `--fit` placement: llama.cpp's `llama-fit-params` prints the fitted
+      `-c / -ngl / -ot` arguments (documented tool). `--fit` shrinks context
+      to `--fit-ctx` (default 4096) *before* placing experts
+- [x] Launch-config experiment (Qwen3-30B-A3B, 787-token prompt, 128 tokens):
+
+      | config | load | prompt tok/s | decode tok/s | RAM (anon / mmap) |
+      |---|---|---|---|---|
+      | default (4 slots) | 10 s | 189 | 17.6 | 0.3 / 17.2 GiB |
+      | `-np 1` | 10 s | 195 | 16.5 | 0.3 / 17.2 GiB |
+      | `-np 1 --load-mode none` | 29 s | 235 | 16.5 | 0.3 / 0.2 GiB |
+
+      Decision: keep llama.cpp defaults (mmap, auto slots); offer
+      `--no-mmap` as an option (+20% prompt speed, 3x slower start, no NVMe paging)
 
 ## M5 — `python -m engine.serve` (launcher & supervisor)
 
-- [ ] Locate `llama-server` (native build, `PATH`, or Docker image)
-- [ ] Zero-flag launch: `--fit on`, `--metrics`, `--jinja`, host/port; pass
-      only what the user overrides (context, VRAM margin, CPU-expert layers)
-- [ ] Parse the fit decision from startup logs into a placement map
-      (layer → experts on GPU or CPU) for the UI
-- [ ] Health check on `/health`, log capture, graceful shutdown, restart on
-      config change
-- [ ] Clear errors for the known failures (model missing, OOM, port in use)
+- [x] Locate llama.cpp binaries: `$LLAMA_CPP_BIN_DIR`, native build, `PATH`
+- [x] Default model `ggml-org/Qwen3.6-35B-A3B-GGUF` Q4_K_M, downloaded on first run
+- [x] Run `llama-fit-params` and read the GGUF layout (llama.cpp's `gguf`
+      package) in parallel; apply `-ngl` / `-ot` with llama.cpp's own rules
+      to show which layers' experts are on GPU, split, or in RAM, with sizes
+- [x] Start `llama-server` with the fitted arguments and `--fit off` (shown
+      placement = actual placement), `--jinja --metrics`, user overrides
+      `--ctx`, `--vram-margin-mib`, `--no-mmap`, passthrough after `--`
+- [x] Health check, log file under `~/.cache/fast-moe/logs/`, Ctrl+C stops
+      the server (verified: 2 s), clear errors for missing binary/model and busy port
+- [ ] Verify on Qwen3.6-35B-A3B once downloaded; pick the default `--ctx`
+      for it from measurements (its KV cache is ~4x smaller per token)
+- [ ] Restart with new settings without exiting (needed by the UI, M6)
 
 ## M6 — Gradio UI (designed with the impeccable skill)
 
@@ -131,3 +145,11 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 - Fast-MoE = model downloader + launcher/supervisor + Gradio config and
   expert-placement visualization + compose file. KTransformers is an optional
   later backend for AMX / high-RAM machines.
+
+**2026-09-13 — during M5: target model is Qwen3.6-35B-A3B**
+- The user asked for Qwen3.6 from the start; the plan wrongly assumed it did
+  not exist and substituted Qwen3-30B-A3B. Qwen3.6-35B-A3B (released
+  2026-04-15; 40 layers with 30 linear-attention + 10 full-attention layers,
+  256 experts, top-8 + shared expert, 262K context) is supported by llama.cpp
+  (`qwen35moe`). Default is now `ggml-org/Qwen3.6-35B-A3B-GGUF` Q4_K_M (19.0 GiB).
+  Qwen3-30B-A3B stays useful as a second test model.

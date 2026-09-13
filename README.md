@@ -8,7 +8,7 @@ with zero manual tuning — and see exactly where every expert lives.**
 
 ## Why
 
-Sparse MoE models like Qwen3-30B-A3B activate only 8 of 128 experts per
+Sparse MoE models like Qwen3.6-35B-A3B activate only 8 of 256 experts per
 token, so most of their weights can sit in system RAM (or on NVMe) while the
 GPU holds the small, always-used parts. The engines that do this well already
 exist — Fast-MoE doesn't reinvent them. It packages them into one command,
@@ -36,31 +36,35 @@ where: which experts are on the GPU, which are in RAM, and what each tier costs.
 
 ## Try it now
 
-Profile your hardware:
-
 ```bash
 pip install -e .
-python -m engine.hardware
+scripts/build_llama_cpp.sh        # pinned llama.cpp release, CUDA build (~10 min)
+python -m engine.serve            # downloads Qwen3.6-35B-A3B Q4_K_M (19 GiB) on first run
 ```
 
-Download the default model (Qwen3-30B-A3B, Q4_K_M, 17.3 GiB) into `models/`:
+`engine.serve` asks llama.cpp where the model fits, tells you where every
+layer's experts will live, then starts an OpenAI-compatible server. On a
+6 GB RTX 3060 Laptop with Qwen3-30B-A3B:
 
-```bash
-python -m engine.models.model_downloader
+```
+Model   Qwen3-30B-A3B-Q4_K_M.gguf  (qwen3moe, 48 layers, 128 experts / 8 active, 17.3 GiB)
+Context 4096 tokens (model max 40960)
+Experts on GPU    3.0 GiB  layers 0-7
+Experts split             layers 8
+Experts in RAM   13.3 GiB  layers 9-47
+
+Ready in 7s  OpenAI API: http://127.0.0.1:8080/v1
 ```
 
-Build llama.cpp (pinned release, CUDA):
-
-```bash
-scripts/build_llama_cpp.sh
-third_party/llama.cpp/build/bin/llama-server \
-  -m models/Qwen3-30B-A3B-GGUF/Qwen3-30B-A3B-Q4_K_M.gguf --jinja --port 8080
-```
+Useful options: `--model <hf-repo or file.gguf>`, `--ctx 16384` (keep more
+context, move more experts to RAM), `--no-mmap`, and any `llama-server` flag
+after `--`. Other tools: `python -m engine.hardware` (hardware profile),
+`python -m engine.models.model_downloader --list` (available quantizations).
 
 ## Coming next
 
-`python -m engine.serve` (one-command launcher), the Gradio UI with the expert
-map, and `docker compose up`. Track progress in [TASKS.md](TASKS.md).
+The Gradio UI with the live expert map, and `docker compose up`. Track
+progress in [TASKS.md](TASKS.md).
 
 ## Credits
 
