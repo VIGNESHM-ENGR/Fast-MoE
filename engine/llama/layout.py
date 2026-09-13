@@ -31,6 +31,8 @@ class ModelLayout:
     context_length: int
     total_bytes: int
     expert_tensors: tuple[ExpertTensor, ...]
+    # llama.cpp always keeps input embeddings on the CPU (dev_input = cpu_dev in llama-model.cpp).
+    embedding_bytes: int = 0
 
 
 @dataclass(frozen=True)
@@ -54,10 +56,13 @@ def read_layout(path: Path) -> ModelLayout:
     reader = GGUFReader(path)
     arch = _field(reader, "general.architecture")
     experts = []
+    embedding_bytes = 0
     for tensor in reader.tensors:
         match = EXPERT_TENSOR.match(tensor.name)
         if match:
             experts.append(ExpertTensor(tensor.name, int(match.group(1)), int(tensor.n_bytes)))
+        elif tensor.name.startswith("token_embd."):
+            embedding_bytes += int(tensor.n_bytes)
     return ModelLayout(
         architecture=arch,
         block_count=_field(reader, f"{arch}.block_count"),
@@ -66,6 +71,7 @@ def read_layout(path: Path) -> ModelLayout:
         context_length=_field(reader, f"{arch}.context_length"),
         total_bytes=sum(int(t.n_bytes) for t in reader.tensors),
         expert_tensors=tuple(experts),
+        embedding_bytes=embedding_bytes,
     )
 
 

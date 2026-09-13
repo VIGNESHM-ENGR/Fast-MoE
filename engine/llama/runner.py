@@ -101,18 +101,27 @@ class Runner:
         return self.server is not None and self.server.proc is not None and self.server.proc.poll() is None
 
     def start(self, settings: RunSettings, on_plan: Callable[[RunPlan], None] | None = None) -> float:
+        # Stop first: llama-fit-params measures free VRAM, which a running server would occupy.
+        self.stop()
+        plan = plan_run(settings)
+        if on_plan:
+            on_plan(plan)
+        return self.launch(plan)
+
+    def launch(self, plan: RunPlan) -> float:
+        """Start llama-server for a plan made while no server was running; returns seconds to healthy."""
         with self._lock:
             self._stop_locked()
+            settings = plan.settings
             server_bin = find_binary("llama-server")
             if port_in_use(settings.host, settings.port):
                 raise ServerError(f"Port {settings.port} is already in use; pick another port.")
-            self.plan = plan_run(settings)
-            if on_plan:
-                on_plan(self.plan)
+            self.plan = plan
             log_path = LOG_DIR / f"llama-server-{time.strftime('%Y%m%d-%H%M%S')}.log"
-            self.server = LlamaServer(server_bin, list(self.plan.server_args), settings.host, settings.port, log_path)
+            self.server = LlamaServer(server_bin, list(plan.server_args), settings.host, settings.port, log_path)
             self.server.start()
-            return self.server.wait_healthy()
+            server = self.server
+        return server.wait_healthy()
 
     def stop(self) -> None:
         with self._lock:
