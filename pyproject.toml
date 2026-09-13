@@ -24,7 +24,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-mock>=3.14",
-    "ruff>=0.4",
+    "ruff==0.16.7",  # pinned: ruff's default rule set changes between releases
 ]
 
 [project.scripts]
@@ -39,3 +39,7 @@ ui = ["assets/*.css", "assets/fonts/*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+# Nested `with` blocks mirror the Gradio page structure (tab > row > column).
+"ui/**" = ["SIM117"]

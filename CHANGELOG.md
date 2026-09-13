@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   memory-tier and layer views built only from the real fit plan, live
   VRAM/RAM/throughput, chat with llama.cpp-measured speed and context use,
   hardware profile, and server logs.
+- Continuous integration (GitHub Actions): ruff lint and pytest on Python
+  3.10 and 3.12. Ruff is pinned so local and CI results match.
 - `python -m engine.serve`: one-command launcher. Downloads the model if
   needed, runs llama.cpp's `llama-fit-params`, prints which layers' experts
   sit on the GPU, split, or in RAM (with sizes, from GGUF metadata), then

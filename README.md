@@ -72,6 +72,16 @@ and watch VRAM, RAM and tokens/s. On the RTX 3060 Laptop (6 GB) Qwen3.6-35B-A3B
 keeps layers 0-3 on the GPU, splits layer 4 and runs layers 5-39 from RAM,
 answering at about 18 tokens/s.
 
+## Development
+
+```bash
+pip install -e ".[dev]"
+ruff check engine ui tests
+pytest
+```
+
+CI runs the same lint and tests on every push and pull request.
+
 ## Coming next
 
 `docker compose up` and benchmarks. Track progress in [TASKS.md](TASKS.md).
