@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `./start.sh [auto|gpu|cpu] [--no-browser] [--no-build]`: checks Docker and the
+  ports, picks GPU or CPU mode, starts the stack, waits for the dashboard, opens
+  it in the browser and streams logs; Ctrl+C runs `docker compose down`.
+- CI runs ShellCheck on the shell scripts.
 - Chat Studio sidebar: a System Prompt panel with presets (Helpful, Concise,
   Coder, Teacher) and a Generation Tuning panel (temperature, top-p, top-k,
   min-p, presence and repeat penalty, max tokens, reasoning on/off) with a
@@ -20,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `AGENTS.md` and `CLAUDE.md` point every coding agent to it.
 - Gemma 4 26B-A4B support, verified on an RTX 3060 Laptop (6 GB): layers 0-1
   on the GPU, layer 2 split, layers 3-29 in RAM, 10.2 tok/s with reasoning.
+
+### Fixed
+- `docker compose down` no longer waits out the 30 s timeout: the dashboard
+  handles SIGTERM, stops llama-server cleanly, and compose runs an init process.
 
 ## [1.0.0] - 2026-09-13
 

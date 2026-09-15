@@ -45,7 +45,9 @@ the OpenAI API; `huggingface_hub` does downloads; Gradio draws the UI.
 4. Run one of:
    - dashboard: `python -m ui.app` → http://127.0.0.1:7860, Preview Placement, Apply & Start;
    - headless: `python -m engine.serve [--model ...] [--ctx N]`;
-   - Docker: `docker compose up` (GPU) or `docker compose -f docker-compose.cpu.yml up`.
+   - Docker, one command: `./start.sh [auto|gpu|cpu] [--no-browser] [--no-build]`; it waits for the
+     dashboard, opens it, streams logs, and Ctrl+C runs `docker compose down`;
+   - plain Compose: `docker compose up` (GPU) or `docker compose -f docker-compose.cpu.yml up`.
 
 Done when `curl http://127.0.0.1:8080/health` returns `{"status":"ok"}` and one chat request
 returns an answer with `timings`.

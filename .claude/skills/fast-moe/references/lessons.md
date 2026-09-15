@@ -19,6 +19,13 @@ Each lesson was hit for real while building Fast-MoE: the symptom, the cause, th
 - **Commands needing sudo** cannot run from an agent's non-interactive shell. Hand the user the
   exact lines for their own terminal, with no leading `!`: in bash `! cmd` inverts the exit
   status, so `! apt-get update && apt-get install ...` skips the install.
+- **Container stops hit the full timeout** when the app runs as PID 1: PID 1 ignores SIGTERM
+  unless it installs a handler, so `docker compose down` waited 30 s and then killed it. Fix:
+  `ui/app.py` handles SIGTERM by exiting through `finally: runner.stop()`, and compose sets
+  `init: true`. Shutdown with a model running dropped from 30 s to 1.7 s.
+- **Testing Ctrl+C from a script**: background jobs of a non-interactive bash ignore SIGINT, so
+  `./start.sh &` then `kill -INT` tests nothing. Start it from Python with
+  `subprocess.Popen(..., start_new_session=True)` and send `os.killpg(pid, signal.SIGINT)`.
 - **NVIDIA Container Toolkit** is required for `docker compose up` with a GPU:
   `apt-get install nvidia-container-toolkit && nvidia-ctk runtime configure --runtime=docker &&
   systemctl restart docker`. Check with `docker info | grep -i runtimes` (expect `nvidia`).

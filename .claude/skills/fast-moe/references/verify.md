@@ -61,6 +61,15 @@ Run the walkthrough against port 7860, and check the host reaches the API at
 `http://127.0.0.1:8080/v1/models` while a model runs. Repeat with
 `docker compose -f docker-compose.cpu.yml` for CPU changes. Finish with `docker compose down`.
 
+## start.sh change
+
+Run `shellcheck start.sh scripts/*.sh` (or `docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable
+/mnt/start.sh`). Then drive it like a user from Python in its own process group: wait for
+"Press Ctrl+C", check `http://127.0.0.1:7860/` returns 200, send SIGINT to the group, and
+confirm "Stopped.", exit code 130 and no `fast-moe` containers left. Cover `auto`, `gpu`,
+`cpu`, a busy port 7860, and a hidden GPU (a fake failing `nvidia-smi` first on `PATH`):
+`gpu` must refuse and `auto` must fall back to CPU.
+
 ## CI
 
 After pushing: `gh run watch <run-id> --exit-status`, then

@@ -128,6 +128,10 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
       reaches the API on 127.0.0.1:8080, 18.1 tok/s (native: 18.3)
 - [x] CPU stack verified: all 40 layers in RAM, 262,144-token context, live
       in 54 s, 3.9 tok/s decode / 7.2 tok/s prompt on the first request
+- [x] `start.sh`: auto/gpu/cpu modes, port and GPU checks, waits for the
+      dashboard, opens the browser, Ctrl+C runs `docker compose down`. Verified:
+      auto chose GPU, cpu, busy port refused, hidden GPU (gpu refuses, auto falls
+      back to CPU); shutdown with Qwen3.6 running took 1.7 s and freed the GPU
 - Not planned: publishing images to a registry. Users build locally with `docker compose up`.
 
 ## M8 — Benchmarks

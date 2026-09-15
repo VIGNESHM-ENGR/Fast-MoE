@@ -64,15 +64,26 @@ Measured on an ASUS TUF laptop: **RTX 3060 Laptop GPU (6 GB)**, Intel i5-11400H,
 
 ## Quick start
 
-### With Docker (recommended)
+### One command (recommended)
 
 ```bash
 git clone https://github.com/VIGNESHM-ENGR/Fast-MoE.git && cd Fast-MoE
-docker compose up                              # NVIDIA GPU
-# or: docker compose -f docker-compose.cpu.yml up   (no GPU)
+./start.sh
 ```
 
-Open **http://127.0.0.1:7860**, pick a model, press **Preview Placement**, then **Apply & Start**. The model downloads on first use (Qwen3.6-35B-A3B is 19 GiB) into `./models`.
+`start.sh` picks GPU or CPU mode, starts the Docker stack, waits until the dashboard is ready, opens **http://127.0.0.1:7860** in your browser and streams the logs. **Press Ctrl+C to stop everything**: it runs `docker compose down` and any running model is shut down cleanly.
+
+| Command | What it does |
+|---|---|
+| `./start.sh` | auto: GPU if Docker can use an NVIDIA GPU, otherwise CPU |
+| `./start.sh gpu` | force GPU mode (fails with a clear reason if the GPU or NVIDIA Container Toolkit is missing) |
+| `./start.sh cpu` | CPU only, no GPU needed |
+| `./start.sh --no-browser` | don't open the browser |
+| `./start.sh --no-build` | reuse the already-built image |
+
+In the dashboard, pick a model, press **Preview Placement**, then **Apply & Start**. The model downloads on first use (Qwen3.6-35B-A3B is 19 GiB) into `./models`.
+
+Prefer plain Compose? `docker compose up` (GPU) or `docker compose -f docker-compose.cpu.yml up` (CPU) do the same without the extras.
 
 <details>
 <summary>GPU prerequisite: NVIDIA Container Toolkit</summary>
