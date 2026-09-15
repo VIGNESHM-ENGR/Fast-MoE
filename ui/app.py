@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import signal
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from html import escape
@@ -27,12 +28,14 @@ from ui.board import BoardView, render_board, render_titleblock
 from ui.chat_hud import render_chat_telemetry
 from ui.metrics import read_usage
 from ui.studio import (
+    CUSTOM_NOTE,
     MODEL_CARD,
     SYSTEM_PRESETS,
     TUNING_PRESETS,
     build_request,
     model_card_html,
     preset_sampling,
+    settings_summary,
 )
 
 ASSETS = Path(__file__).resolve().parent / "assets"
@@ -335,13 +338,50 @@ def _text(content) -> str:
     return "".join(block.get("text", "") for block in content if isinstance(block, dict))
 
 
+# One conversation streams at a time (single local user); Stop closes its HTTP stream, and
+# llama-server cancels a generation as soon as its client disconnects.
+active_chat: dict = {"stream": None, "stop": threading.Event(), "busy": False}
+
+
+def stop_chat() -> None:
+    active_chat["stop"].set()
+    stream = active_chat["stream"]
+    if stream is not None:
+        stream.close()
+
+
 def chat(message: str, history: list, system_prompt: str, temperature: float, top_p: float, top_k: float,
          min_p: float, presence_penalty: float, repeat_penalty: float, max_tokens: float,
-         thinking: bool) -> Iterator[tuple[str, list, str]]:
+         reasoning: bool) -> Iterator[tuple[str, list, str]]:
+    if active_chat["busy"]:  # a second Enter/Send while streaming: keep the typed text, change nothing
+        yield gr.skip(), gr.skip(), gr.skip()
+        return
     if not message.strip():
         yield "", history, render_chat_telemetry()
         return
+    sampling = Sampling(temperature=temperature, top_p=top_p, top_k=int(top_k), min_p=min_p,
+                        presence_penalty=presence_penalty, repeat_penalty=repeat_penalty)
     history = [*history, {"role": "user", "content": message}]
+    yield from _reply(history, system_prompt, sampling, int(max_tokens), bool(reasoning))
+
+
+def prepare_retry(history: list, retry_data: gr.RetryData) -> tuple[str, list]:
+    """Regenerate: drop the chosen user message and what followed, and resend it with the current settings."""
+    if active_chat["busy"]:
+        return "", gr.skip()
+    return _text(history[retry_data.index]["content"]), history[:retry_data.index]
+
+
+def undo(history: list, undo_data: gr.UndoData) -> tuple[str, list]:
+    """Remove the last exchange and put its message back in the input box."""
+    if active_chat["busy"]:
+        return gr.skip(), gr.skip()
+    return _text(history[undo_data.index]["content"]), history[:undo_data.index]
+
+
+def _reply(history: list, system_prompt: str, sampling: Sampling, max_tokens: int,
+           reasoning: bool) -> Iterator[tuple[str, list, str]]:
+    sent_note = settings_summary(sampling, max_tokens, reasoning)
     if not runner.running:
         history.append({"role": "assistant", "content": "⚠️ **No model is running yet.** Go to the "
                         "**⚡ Engine & Memory Topology** tab and click **'Apply & Start'** first."})
@@ -352,9 +392,9 @@ def chat(message: str, history: list, system_prompt: str, temperature: float, to
     client = OpenAI(base_url=f"{runner.server.url}/v1", api_key="local")
     sent = [{"role": m["role"], "content": _text(m["content"])} for m in history
             if not (m.get("metadata") or {}).get("title")]
-    thinking = {"role": "assistant", "content": "", "metadata": {"title": "Thinking Process"}}
+    thought = {"role": "assistant", "content": "", "metadata": {"title": "Thinking", "status": "pending"}}
     answer = {"role": "assistant", "content": ""}
-    plan = panel["plan"]
+    plan = runner.plan or panel["plan"]
     ctx_max = (plan.fit.context or plan.layout.context_length) if plan else 4096
 
     start_time = time.time()
@@ -362,16 +402,23 @@ def chat(message: str, history: list, system_prompt: str, temperature: float, to
     ttft_ms = reasoning_s = gen_s = 0.0
     chunks = 0
     state = "starting"
-    yield "", history, render_chat_telemetry(state=state, ctx_max=ctx_max)
+    usage = timings = None
+    active_chat["stop"].clear()
+    active_chat["busy"] = True
+    yield "", history, render_chat_telemetry(state=state, ctx_max=ctx_max, sent_note=sent_note)
+
+    def finish_thought(now: float) -> None:
+        if thought in history and thought["metadata"]["status"] == "pending":
+            thought["metadata"].update(status="done", duration=round(now - first_token_time, 1))
 
     try:
-        sampling = Sampling(temperature=temperature, top_p=top_p, top_k=int(top_k), min_p=min_p,
-                            presence_penalty=presence_penalty, repeat_penalty=repeat_penalty)
-        request = build_request(system_prompt or "", sent, sampling, max_tokens, thinking)
+        request = build_request(system_prompt or "", sent, sampling, max_tokens, reasoning)
         stream = client.chat.completions.create(model="local", stream=True, stream_options={"include_usage": True},
                                                 **request)
-        usage = timings = None
+        active_chat["stream"] = stream
         for chunk in stream:
+            if active_chat["stop"].is_set():
+                break
             usage = chunk.usage or usage
             timings = (chunk.model_extra or {}).get("timings") or timings  # llama-server extension
             if not chunk.choices:
@@ -381,15 +428,16 @@ def chat(message: str, history: list, system_prompt: str, temperature: float, to
                 first_token_time = now
                 ttft_ms = (now - start_time) * 1000.0
             delta = chunk.choices[0].delta
-            reasoning = getattr(delta, "reasoning_content", None)
-            if reasoning:
+            text = getattr(delta, "reasoning_content", None)
+            if text:
                 state = "reasoning"
                 reasoning_s = now - first_token_time
-                if thinking not in history:
-                    history.append(thinking)
-                thinking["content"] += reasoning
+                if thought not in history:
+                    history.append(thought)
+                thought["content"] += text
             if delta.content:
                 reasoning_end_time = reasoning_end_time or now
+                finish_thought(now)
                 state = "generating"
                 gen_s = now - reasoning_end_time
                 if answer not in history:
@@ -400,17 +448,33 @@ def chat(message: str, history: list, system_prompt: str, temperature: float, to
             yield "", history, render_chat_telemetry(
                 state=state, tps=chunks / elapsed if elapsed > 0 else 0.0, ttft_ms=ttft_ms,
                 reasoning_s=reasoning_s, gen_s=gen_s, ctx_max=ctx_max, total_tokens=chunks,
-                speed_note="Live estimate (stream chunks/s)")
-
-        tps = timings.get("predicted_per_second", 0.0) if timings else 0.0
-        yield "", history, render_chat_telemetry(
-            state="completed", tps=tps, ttft_ms=ttft_ms, reasoning_s=reasoning_s, gen_s=gen_s,
-            ctx_used=usage.total_tokens if usage else None, ctx_max=ctx_max,
-            total_tokens=usage.completion_tokens if usage else chunks,
-            speed_note="Measured by llama.cpp" if timings else "Not reported by the server")
+                speed_note="Live estimate (stream chunks/s)", sent_note=sent_note)
     except Exception as exc:  # noqa: BLE001 - UI boundary: report the failure inside the conversation
-        history.append({"role": "assistant", "content": f"❌ Request error: {exc}"})
-        yield "", history, render_chat_telemetry(state="error")
+        if not active_chat["stop"].is_set():  # closing the stream on Stop surfaces as a read error
+            finish_thought(time.time())
+            history.append({"role": "assistant", "content": f"❌ Request error: {exc}"})
+            yield "", history, render_chat_telemetry(state="error", sent_note=sent_note)
+            return
+    finally:
+        active_chat["stream"] = None
+        active_chat["busy"] = False
+
+    if first_token_time is not None:
+        finish_thought(time.time())
+    if active_chat["stop"].is_set():
+        if answer not in history:
+            history.append(answer)
+        answer["content"] += "\n\n*⏹ Stopped.*" if answer["content"] else "*⏹ Stopped before the answer started.*"
+        yield "", history, render_chat_telemetry(
+            state="stopped", ttft_ms=ttft_ms, reasoning_s=reasoning_s, gen_s=gen_s, ctx_max=ctx_max,
+            total_tokens=chunks, speed_note="Stopped", sent_note=sent_note)
+        return
+    tps = timings.get("predicted_per_second", 0.0) if timings else 0.0
+    yield "", history, render_chat_telemetry(
+        state="completed", tps=tps, ttft_ms=ttft_ms, reasoning_s=reasoning_s, gen_s=gen_s,
+        ctx_used=usage.total_tokens if usage else None, ctx_max=ctx_max,
+        total_tokens=usage.completion_tokens if usage else chunks,
+        speed_note="Measured by llama.cpp" if timings else "Not reported by the server", sent_note=sent_note)
 
 
 def build() -> gr.Blocks:
@@ -462,11 +526,12 @@ def build() -> gr.Blocks:
                         p1 = gr.Button("💡 How does Fast-MoE fit a 35B model on 6 GB?", elem_classes=["fm-chip-btn"], size="sm")
                         p2 = gr.Button("⚡ Explain Mixture-of-Experts", elem_classes=["fm-chip-btn"], size="sm")
                         p3 = gr.Button("🐍 Python script to benchmark memory bandwidth", elem_classes=["fm-chip-btn"], size="sm")
-                    chatbot = gr.Chatbot(height=520, label="Conversation", show_label=False,
+                    chatbot = gr.Chatbot(height=520, label="Conversation", show_label=False, buttons=["copy", "copy_all"],
                                          placeholder="Start a model on the Engine tab, then say hello.")
                     with gr.Row():
                         msg = gr.Textbox(placeholder="Type a message to the running model...", show_label=False, scale=1)
                         send_btn = gr.Button("Send", variant="primary", scale=0, min_width=110)
+                        stop_chat_btn = gr.Button("⏹ Stop", variant="stop", scale=0, min_width=110, visible=False)
                         clear_btn = gr.Button("Clear", variant="secondary", scale=0, min_width=90)
 
                 with gr.Column(scale=4, min_width=320, elem_classes=["fm-studio-sidebar"]):
@@ -494,7 +559,7 @@ def build() -> gr.Blocks:
                         tuning_preset = gr.Radio(choices=list(TUNING_PRESETS), value=MODEL_CARD, show_label=False,
                                                  elem_classes=["fm-segmented"])
                         tuning_note = gr.HTML(f'<p class="fm-tuning-note">{start_note}</p>')
-                        thinking = gr.Checkbox(value=True, label="Reasoning",
+                        reasoning = gr.Checkbox(value=True, label="Reasoning",
                                                info="Let the model think before answering. Off is faster.",
                                                elem_classes=["fm-think-toggle"])
                         temperature = gr.Slider(0.0, 2.0, value=start_sampling.temperature, step=0.05, label="Temperature",
@@ -536,27 +601,55 @@ def build() -> gr.Blocks:
         # Event Handlers
         inputs = [model, ctx, margin, mmap]
         preview_btn.click(preview, inputs, [title, board, command], concurrency_limit=1)
-        apply_btn.click(apply, inputs, [title, board, command], concurrency_limit=1)
+        apply_event = apply_btn.click(apply, inputs, [title, board, command], concurrency_limit=1)
         stop_btn.click(stop, None, [title, board])
 
         chat_inputs = [msg, chatbot, system_prompt, temperature, top_p, top_k, min_p, presence_penalty,
-                       repeat_penalty, max_tokens, thinking]
-        msg.submit(chat, chat_inputs, [msg, chatbot, chat_hud])
-        send_btn.click(chat, chat_inputs, [msg, chatbot, chat_hud])
+                       repeat_penalty, max_tokens, reasoning]
+        chat_outputs = [msg, chatbot, chat_hud]
+
+        def streaming(on: bool):
+            return gr.update(visible=not on), gr.update(visible=on)
+
+        chat_buttons = [send_btn, stop_chat_btn]
+        retry_message = gr.State("")
+        for event in (msg.submit(lambda: streaming(True), None, chat_buttons, queue=False)
+                      .then(chat, chat_inputs, chat_outputs),
+                      send_btn.click(lambda: streaming(True), None, chat_buttons, queue=False)
+                      .then(chat, chat_inputs, chat_outputs),
+                      chatbot.retry(prepare_retry, chatbot, [retry_message, chatbot], queue=False)
+                      .then(lambda: streaming(True), None, chat_buttons, queue=False)
+                      .then(chat, [retry_message, *chat_inputs[1:]], chat_outputs)):
+            event.then(lambda: streaming(False), None, chat_buttons, queue=False)
+        chatbot.undo(undo, chatbot, [msg, chatbot])
+        stop_chat_btn.click(stop_chat, None, None, queue=False)
         model.change(model_card_html, model, model_card)
         model.change(catalog.default_ctx, model, ctx)
         system_preset.change(lambda name: SYSTEM_PRESETS[name], system_preset, system_prompt)
 
-        def apply_tuning_preset(preset: str, selected_model: str):
+        def apply_tuning_preset(preset: str | None, selected_model: str):
+            if preset not in TUNING_PRESETS:  # custom slider values: leave them alone
+                return (gr.skip(),) * 7
             running = str(runner.plan.model_path) if runner.running and runner.plan else selected_model
             s, note = preset_sampling(preset, running)
             return (s.temperature, s.top_p, s.top_k, s.min_p, s.presence_penalty, s.repeat_penalty,
                     f'<p class="fm-tuning-note">{note}</p>')
 
         tuning_outputs = [temperature, top_p, top_k, min_p, presence_penalty, repeat_penalty, tuning_note]
-        tuning_preset.change(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
+        tuning_preset.input(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
         model.change(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
-        clear_btn.click(lambda: ([], render_chat_telemetry()), None, [chatbot, chat_hud])
+        # Model card values follow the running model, which can differ from the dropdown after a reload.
+        demo.load(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
+        apply_event.then(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
+        for slider in tuning_outputs[:6]:
+            slider.input(lambda: (None, f'<p class="fm-tuning-note">{CUSTOM_NOTE}</p>'), None,
+                         [tuning_preset, tuning_note], queue=False)
+
+        def clear_chat():
+            stop_chat()
+            return [], render_chat_telemetry()
+
+        clear_btn.click(clear_chat, None, [chatbot, chat_hud])
 
         # Quick prompt buttons
         p1.click(lambda: "How does Fast-MoE run a 35-Billion parameter model on a 6GB GPU without crashing?", None, msg)

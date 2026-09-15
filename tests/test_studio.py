@@ -6,6 +6,7 @@ from ui.studio import (
     build_request,
     model_card_html,
     preset_sampling,
+    settings_summary,
 )
 
 GEMMA = "/models/gemma-4-26B-A4B-it-GGUF/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf"
@@ -47,3 +48,9 @@ def test_model_card_html_for_catalog_and_custom_models():
     assert "15.8 GiB download" in model_card_html("unsloth/gemma-4-26B-A4B-it-GGUF")
     custom = model_card_html("/models/x/<b>odd</b>.gguf")
     assert "custom" in custom and "<b>odd" not in custom
+
+
+def test_settings_summary_names_every_sent_value():
+    s = Sampling(temperature=0.3, top_p=0.9, top_k=20, min_p=0.05, presence_penalty=0, repeat_penalty=1.1)
+    assert settings_summary(s, 1024, False) == ("temp 0.3 · top-p 0.9 · top-k 20 · min-p 0.05 · presence 0 · "
+                                                "repeat 1.1 · max 1024 · reasoning off")

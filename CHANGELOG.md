@@ -15,8 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   RAM; the dashboard reads the cap as total RAM.
 - `benchmarks/bench_context.py`: decode speed, GPU utilisation and placement
   at several context sizes.
+- Chat Studio: a Stop button replaces Send while a reply streams and ends the
+  generation on the server (freed in 0.6 s); Regenerate and Undo on messages;
+  copy buttons; the HUD shows the exact settings each reply was sent with; the
+  Thinking block collapses with its duration once the answer starts.
 
 ### Fixed
+- Chat Studio's Reasoning switch had no effect: the request always asked for
+  reasoning. Turning it off now sends `enable_thinking: false`.
+- Tuning sliders showed the dropdown model's settings instead of the running
+  model's; the Model card preset now follows the running model, moving a slider
+  marks the settings as custom, and changing the model no longer overwrites them.
+- The Chat Studio telemetry fits phone screens (two columns).
 - System RAM looked empty while a model ran: the memory-mapped model file sits
   in the page cache, which Linux does not count as used. The RAM meter now shows
   the model file held in RAM (llama-server's `RssFile`) next to used memory, and

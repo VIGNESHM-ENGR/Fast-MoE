@@ -846,6 +846,16 @@ body, html {
   }
 }
 
+@media (max-width: 640px) {
+  .fm-hud-cluster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.6rem;
+  }
+  .fm-hud-cluster .fm-hud-cell:first-child { grid-column: 1 / -1; }
+  .fm-hud-cluster .fm-hud-cell svg { max-width: 100%; height: auto; }
+}
+
 .fm-hud-cell {
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-subtle);
@@ -941,6 +951,17 @@ body, html {
 
 .state-error { background: rgba(244, 63, 94, 0.1); border: 1px solid var(--rose-bright); color: var(--rose-bright); }
 .state-error .fm-hud-dot { background: var(--rose-bright); }
+
+.state-stopped { background: rgba(148, 163, 184, 0.1); border: 1px solid var(--text-secondary); color: var(--text-secondary); }
+.state-stopped .fm-hud-dot { background: var(--text-secondary); }
+
+.fm-hud-sent {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: left;
+}
 
 .fm-hud-subtext {
   font-size: 0.65rem;

@@ -119,6 +119,7 @@ def render_chat_telemetry(
     ctx_max: int = 4096,
     total_tokens: int = 0,
     speed_note: str = "Awaiting a request",
+    sent_note: str = "",
 ) -> str:
     """Renders the entire cockpit cluster HUD banner for the Chat Studio."""
 
@@ -130,6 +131,7 @@ def render_chat_telemetry(
         "generating": ("🚀 ANSWERING", "state-generating", "Streaming final answer tokens..."),
         "completed": ("✓ COMPLETE", "state-completed", f"Finished {total_tokens} tokens"),
         "error": ("❌ ERROR", "state-error", "Generation error occurred"),
+        "stopped": ("⏹ STOPPED", "state-stopped", f"Stopped after {total_tokens} tokens"),
     }
     badge_text, badge_cls, state_desc = state_map.get(state, ("⚪ READY", "state-idle", ""))
 
@@ -208,5 +210,6 @@ def render_chat_telemetry(
         </div>
         <div class="fm-hud-subtext">Two-phase execution telemetry</div>
       </div>
+      {f'<div class="fm-hud-sent">Sent to llama-server: {escape(sent_note)}</div>' if sent_note else ""}
     </div>
     """

@@ -40,6 +40,16 @@ def preset_sampling(preset: str, model: str | Path | None) -> tuple[Sampling, st
     return FAST_MOE_PRESETS[preset], f"Fast-MoE's “{preset}” preset. Tweak any slider to taste."
 
 
+CUSTOM_NOTE = "Custom settings. Pick a preset to reset the sliders."
+
+
+def settings_summary(sampling: Sampling, max_tokens: int, thinking: bool) -> str:
+    """The sampling settings a reply was requested with, in one line."""
+    return (f"temp {sampling.temperature:g} · top-p {sampling.top_p:g} · top-k {sampling.top_k} · "
+            f"min-p {sampling.min_p:g} · presence {sampling.presence_penalty:g} · "
+            f"repeat {sampling.repeat_penalty:g} · max {int(max_tokens)} · reasoning {'on' if thinking else 'off'}")
+
+
 def build_request(system_prompt: str, messages: list[dict], sampling: Sampling, max_tokens: int,
                   thinking: bool) -> dict:
     """Keyword arguments for openai `chat.completions.create` against llama-server."""

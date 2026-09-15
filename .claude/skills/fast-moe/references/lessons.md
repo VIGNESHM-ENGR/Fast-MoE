@@ -97,6 +97,18 @@ Each lesson was hit for real while building Fast-MoE: the symptom, the cause, th
 - A long-running UI process keeps serving old code. Before testing, `ss -ltnp | grep 7860` and
   restart it, or use another port via `FAST_MOE_UI_PORT`.
 - `gradio_client.Client(url).view_api()` lists the app's endpoints for scripted checks.
+- **Event data only reaches the first handler** of a chain: `chatbot.retry(fn).then(g)` passes
+  `gr.RetryData` to `fn`; in `g` it fails with `TypeError: 'NoneType' object is not subscriptable`.
+  Stash what you need in a `gr.State` in the first step.
+- **Stopping a streamed reply**: close the OpenAI stream (`stream.close()`); llama-server cancels
+  the generation when the client disconnects (slot free in ~0.6 s). Gradio `cancels=` alone leaves
+  the HTTP stream open.
+- **Don't shadow handler arguments**: `chat(..., thinking)` reused `thinking` for the thought
+  message dict, so `bool(dict)` sent reasoning on every time. `tests/test_chat.py` guards it.
+- At 390 px Gradio folds tabs into a `…` menu; in Playwright, click the tab at desktop width and
+  then resize.
+- **`pkill -f` / `pgrep -f` with a pattern that appears in your own command** matches the agent's
+  shell and kills it; match on a path the command line does not contain literally.
 
 ## Repo and tooling
 

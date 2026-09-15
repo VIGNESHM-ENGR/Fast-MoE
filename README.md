@@ -69,7 +69,7 @@ A longer context needs a bigger KV cache on the GPU, so llama.cpp moves experts 
 </tr>
 </table>
 
-**Chat with control, and live telemetry.** Pick a system prompt preset (Helpful, Concise, Coder, Teacher) or write your own, and tune generation with one click: the *Model card* preset applies each model's official recommended settings, and sliders cover temperature, top-p, top-k, penalties, max tokens and reasoning on/off. Speed, context used, time to first token and reasoning-versus-answering time all come from the inference server itself.
+**Chat with control, and live telemetry.** Pick a system prompt preset (Helpful, Concise, Coder, Teacher) or write your own, and tune generation with one click: the *Model card* preset applies each model's official recommended settings, and sliders cover temperature, top-p, top-k, penalties, max tokens and reasoning on/off. Stop a reply mid-stream, regenerate it after changing a setting, and see the exact settings each reply was sent with. Speed, context used, time to first token and reasoning-versus-answering time all come from the inference server itself.
 
 <img src="docs/images/dashboard-chat.png" alt="Chat Studio with Gemma 4: system prompt presets, generation tuning, and live telemetry" width="100%">
 
