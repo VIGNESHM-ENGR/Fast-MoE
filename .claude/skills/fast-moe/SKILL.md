@@ -45,7 +45,7 @@ the OpenAI API; `huggingface_hub` does downloads; Gradio draws the UI.
 4. Run one of:
    - dashboard: `python -m ui.app` → http://127.0.0.1:7860, Preview Placement, Apply & Start;
    - headless: `python -m engine.serve [--model ...] [--ctx N]`;
-   - Docker, one command: `./start.sh [auto|gpu|cpu] [--no-browser] [--no-build]`; it waits for the
+   - Docker, one command: `./start.sh [auto|gpu|cpu] [--no-browser] [--no-build] [--ram-limit 20g]`; it waits for the
      dashboard, opens it, streams logs, and Ctrl+C runs `docker compose down`;
    - plain Compose: `docker compose up` (GPU) or `docker compose -f docker-compose.cpu.yml up`.
 
@@ -97,5 +97,6 @@ Done when `gh api repos/<owner>/Fast-MoE/releases/latest` returns the new tag.
 | `FAST_MOE_UI_HOST` / `FAST_MOE_UI_PORT` | `127.0.0.1` / `7860` | dashboard address |
 | `FAST_MOE_NVME_CACHE_DIR` | auto | cold-tier directory the hardware profiler measures |
 | `FAST_MOE_UID` / `FAST_MOE_GID` | `1000` | container user in compose |
+| `FAST_MOE_RAM_LIMIT` | unset (no cap) | container RAM cap in compose, e.g. `20g` |
 | `HF_HUB_DISABLE_XET` | unset | set to `1` when Hugging Face Xet downloads stall |
 | `LLAMA_CPP_TAG` | `b10937` | llama.cpp release `scripts/build_llama_cpp.sh` builds |

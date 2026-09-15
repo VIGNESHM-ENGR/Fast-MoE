@@ -4,7 +4,7 @@
 #   ./start.sh              auto: GPU if Docker can use an NVIDIA GPU, otherwise CPU
 #   ./start.sh gpu          NVIDIA GPU (docker-compose.yml)
 #   ./start.sh cpu          CPU only (docker-compose.cpu.yml)
-#   ./start.sh --no-browser --no-build
+#   ./start.sh --no-browser --no-build --ram-limit 20g
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,10 +24,12 @@ Options:
   auto | gpu | cpu   device mode (default: auto)
   --no-browser       don't open the dashboard in a browser
   --no-build         start the existing image without rebuilding
+  --ram-limit SIZE   cap the container's RAM, e.g. 20g or 16384m (default: no cap)
   -h, --help         show this help
 
 Environment:
   FAST_MOE_START_TIMEOUT  seconds to wait for the dashboard (default 600)
+  FAST_MOE_RAM_LIMIT      same as --ram-limit
 EOF
 }
 
@@ -40,11 +42,22 @@ while [[ $# -gt 0 ]]; do
     auto|gpu|cpu) mode="$1" ;;
     --no-browser) open_browser=0 ;;
     --no-build) build=0 ;;
+    --ram-limit)
+      [[ $# -ge 2 ]] || die "--ram-limit needs a size, e.g. --ram-limit 20g"
+      FAST_MOE_RAM_LIMIT="$2"
+      shift
+      ;;
+    --ram-limit=*) FAST_MOE_RAM_LIMIT="${1#*=}" ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "unknown argument: $1" ;;
   esac
   shift
 done
+
+if [[ -n "${FAST_MOE_RAM_LIMIT:-}" ]]; then
+  [[ "$FAST_MOE_RAM_LIMIT" =~ ^[1-9][0-9]*[gGmM]$ ]] || die "RAM limit must look like 20g or 16384m, got '$FAST_MOE_RAM_LIMIT'."
+  export FAST_MOE_RAM_LIMIT
+fi
 
 command -v docker >/dev/null || die "Docker is not installed: https://docs.docker.com/engine/install/"
 docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required ('docker compose')."
@@ -113,7 +126,7 @@ trap 'exit 130' INT TERM
 
 up_args=(up --detach)
 [[ $build -eq 1 ]] && up_args+=(--build)
-say "Starting Fast-MoE in $mode mode..."
+say "Starting Fast-MoE in $mode mode${FAST_MOE_RAM_LIMIT:+ with a ${FAST_MOE_RAM_LIMIT} RAM limit}..."
 "${compose[@]}" "${up_args[@]}"
 
 say "Waiting for the dashboard at $UI_URL ..."

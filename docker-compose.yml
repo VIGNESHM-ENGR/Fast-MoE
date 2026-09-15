@@ -16,6 +16,11 @@ services:
       - "127.0.0.1:8080:8080"  # OpenAI-compatible API while a model is running
     volumes:
       - ./models:/models
+    # RAM cap for the container, e.g. FAST_MOE_RAM_LIMIT=20g (./start.sh --ram-limit 20g); unset = no cap.
+    # The memory-mapped model counts as reclaimable cache, so a cap below the model size makes the
+    # kernel re-read expert pages from disk instead of failing.
+    mem_limit: ${FAST_MOE_RAM_LIMIT:-0}
+    memswap_limit: ${FAST_MOE_RAM_LIMIT:-0}
     deploy:
       resources:
         reservations:
