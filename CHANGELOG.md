@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Agent skill (`.claude/skills/fast-moe/`) with project rules, setup, change,
   add-a-model, verification and release procedures, and lessons learned;
   `AGENTS.md` and `CLAUDE.md` point every coding agent to it.
+- Gemma 4 26B-A4B support, verified on an RTX 3060 Laptop (6 GB): layers 0-1
+  on the GPU, layer 2 split, layers 3-29 in RAM, 10.2 tok/s with reasoning.
 
 ## [1.0.0] - 2026-09-13
 

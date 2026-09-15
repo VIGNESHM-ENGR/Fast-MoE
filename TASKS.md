@@ -104,6 +104,12 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 - [ ] Per-expert activity (which experts fire): needs routing statistics
       llama.cpp does not expose yet
 - [ ] Model download with progress from the UI
+- [x] Chat Studio sidebar: system prompt presets and generation tuning with a
+      "Model card" preset; verified via llama-server `/slots` that the chosen
+      temperature, top-p, top-k and max tokens reach the model
+- [x] Tested-model catalog in the model picker; Gemma 4 26B-A4B (UD-Q4_K_M)
+      verified on the RTX 3060 Laptop: layers 0-1 GPU, 2 split, 3-29 RAM,
+      live 15 s after Apply, 10.2 tok/s, TTFT 3.6 s, no page errors
 
 ## M7 — Docker
 

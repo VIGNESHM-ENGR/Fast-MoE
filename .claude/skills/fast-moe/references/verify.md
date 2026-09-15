@@ -77,3 +77,4 @@ machine is a regression to explain.
 | Qwen3.6-35B-A3B | layers 0-3 GPU, 4 split, 5-39 RAM | 19 s | 18.3 tok/s native, 18.1 Docker |
 | Qwen3.6-35B-A3B, CPU-only Docker | all 40 layers RAM, 262,144 ctx | 54 s | 3.9 tok/s |
 | Qwen3-30B-A3B | layers 0-7 GPU, 8 split, 9-47 RAM | 7 s (`engine.serve`) | 16-18 tok/s |
+| Gemma 4 26B-A4B (UD-Q4_K_M) | layers 0-1 GPU, 2 split, 3-29 RAM | 15 s (preview 22 s) | 10.2 tok/s, TTFT 3.6 s |

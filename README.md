@@ -56,9 +56,11 @@ Measured on an ASUS TUF laptop: **RTX 3060 Laptop GPU (6 GB)**, Intel i5-11400H,
 </tr>
 </table>
 
-**Live telemetry while you chat.** Speed, context used, time to first token and how long the model spent reasoning versus answering, all taken from the inference server itself rather than estimated.
+**Chat with control, and live telemetry.** Pick a system prompt preset (Helpful, Concise, Coder, Teacher) or write your own, and tune generation with one click: the *Model card* preset applies each model's official recommended settings, and sliders cover temperature, top-p, top-k, penalties, max tokens and reasoning on/off. Speed, context used, time to first token and reasoning-versus-answering time all come from the inference server itself.
 
-<img src="docs/images/dashboard-chat.png" alt="Chat Studio telemetry: generation speed, context usage, time to first token, reasoning vs answering" width="100%">
+<img src="docs/images/dashboard-chat.png" alt="Chat Studio with Gemma 4: system prompt presets, generation tuning, and live telemetry" width="100%">
+
+<sub>Gemma 4 26B-A4B answering with the Coder system prompt and its model-card settings (temperature 1.0, top-p 0.95, top-k 64).</sub>
 
 ## Quick start
 
@@ -160,14 +162,17 @@ tests/             unit tests (no GPU needed); CI runs lint, tests and a Docker 
 ```
 </details>
 
-## Tested with
+## Supported models
 
-| Model | Architecture | Result on the 6 GB laptop |
-|---|---|---|
-| Qwen3.6-35B-A3B Q4_K_M | 40 layers, 256 experts, 8 active | 18.3 tokens/s, layers 0–3 on GPU |
-| Qwen3-30B-A3B Q4_K_M | 48 layers, 128 experts, 8 active | 16–18 tokens/s, layers 0–7 on GPU |
+These are verified on the 6 GB laptop and listed in the dashboard's model picker (with a one-click download if missing):
 
-Other Mixture-of-Experts models that llama.cpp supports should work; these two are the ones verified so far.
+| Model | Download (Q4) | Architecture | Result on the 6 GB laptop |
+|---|---|---|---|
+| **Qwen3.6-35B-A3B** | 19.0 GiB · [ggml-org](https://huggingface.co/ggml-org/Qwen3.6-35B-A3B-GGUF) | 40 layers, 256 experts, 8 active | 18.3 tokens/s · layers 0–3 on GPU |
+| **Gemma 4 26B-A4B** | 15.8 GiB · [unsloth UD-Q4_K_M](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) | 30 layers, 128 experts, 8 active + 1 shared | 10.2 tokens/s · layers 0–1 on GPU |
+| **Qwen3-30B-A3B** | 17.3 GiB · [Qwen](https://huggingface.co/Qwen/Qwen3-30B-A3B-GGUF) | 48 layers, 128 experts, 8 active | 16–18 tokens/s · layers 0–7 on GPU |
+
+Each runs with its model card's recommended sampling by default. Other Mixture-of-Experts GGUF models that llama.cpp supports load too (pick the file or type a Hugging Face repo); these three are the ones verified so far. Quantized (Q4) weights only.
 
 ## Roadmap
 
@@ -190,7 +195,7 @@ pytest
 ## Credits
 
 - [llama.cpp](https://github.com/ggml-org/llama.cpp): the inference engine underneath.
-- [Qwen](https://huggingface.co/Qwen): the Qwen3.6 and Qwen3 models; GGUF builds by [ggml-org](https://huggingface.co/ggml-org).
+- [Qwen](https://huggingface.co/Qwen) and [Google](https://huggingface.co/google): the Qwen3.6, Qwen3 and Gemma 4 models; GGUF builds by [ggml-org](https://huggingface.co/ggml-org) and [Unsloth](https://huggingface.co/unsloth).
 - [KTransformers](https://github.com/kvcache-ai/ktransformers), [MoE-Infinity](https://arxiv.org/abs/2401.14361) and [PreScope](https://arxiv.org/abs/2509.23638): research on CPU/GPU expert offloading that shaped this project.
 
 ## License
