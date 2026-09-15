@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import signal
+import sys
 import time
 from collections.abc import Iterator
 from html import escape
@@ -602,6 +604,8 @@ THEME = gr.themes.Base(
 
 def main() -> None:
     css = (ASSETS / "board.css").read_text().replace("/gradio_api/file=ui/assets/", f"/gradio_api/file={ASSETS}/")
+    # `docker compose down` sends SIGTERM; exit through `finally` so llama-server is stopped cleanly.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:
         build().queue().launch(server_name=os.environ.get("FAST_MOE_UI_HOST", "127.0.0.1"),
                                server_port=int(os.environ.get("FAST_MOE_UI_PORT", "7860")), theme=THEME, css=css,

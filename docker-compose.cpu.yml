@@ -15,4 +15,5 @@ services:
       - "127.0.0.1:8080:8080"  # OpenAI-compatible API while a model is running
     volumes:
       - ./models:/models
+    init: true  # reaps llama-server and forwards stop signals
     restart: unless-stopped

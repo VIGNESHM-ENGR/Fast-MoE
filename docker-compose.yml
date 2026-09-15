@@ -23,4 +23,5 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    init: true  # reaps llama-server and forwards stop signals
     restart: unless-stopped
