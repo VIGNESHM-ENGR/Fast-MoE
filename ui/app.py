@@ -18,10 +18,20 @@ from engine.hardware.profiler import (
     profile_hardware,
 )
 from engine.llama.runner import Runner, RunPlan, RunSettings, plan_run
+from engine.models import catalog
+from engine.models.catalog import Sampling
 from engine.models.model_downloader import DEFAULT_QUANT, DEFAULT_REPO, local_model, models_dir
 from ui.board import BoardView, render_board, render_titleblock
 from ui.chat_hud import render_chat_telemetry
 from ui.metrics import read_usage
+from ui.studio import (
+    MODEL_CARD,
+    SYSTEM_PRESETS,
+    TUNING_PRESETS,
+    build_request,
+    model_card_html,
+    preset_sampling,
+)
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 GiB = 1024**3
@@ -55,9 +65,13 @@ def model_choices() -> list[tuple[str, str]]:
     root = models_dir()
     files = sorted(p for p in root.rglob("*.gguf")
                    if ".cache" not in p.parts and not p.name.startswith(("mmproj", "mtp", "dflash")))
-    choices = [(p.name, str(p)) for p in files]
-    if not local_model(DEFAULT_REPO, DEFAULT_QUANT):
-        choices.append((f"{DEFAULT_REPO} ({DEFAULT_QUANT}, downloads on Apply)", DEFAULT_REPO))
+    choices = []
+    for f in files:
+        entry = catalog.find(f)
+        choices.append((f"{entry.name} · {entry.quant} · on disk" if entry else f.name, str(f)))
+    for entry in catalog.CATALOG:
+        if not local_model(entry.repo, entry.quant):
+            choices.append((f"{entry.name} · {entry.download_gib:.1f} GiB download on Apply", entry.repo))
     return choices
 
 
@@ -313,7 +327,9 @@ def _text(content) -> str:
     return "".join(block.get("text", "") for block in content if isinstance(block, dict))
 
 
-def chat(message: str, history: list) -> Iterator[tuple[str, list, str]]:
+def chat(message: str, history: list, system_prompt: str, temperature: float, top_p: float, top_k: float,
+         min_p: float, presence_penalty: float, repeat_penalty: float, max_tokens: float,
+         thinking: bool) -> Iterator[tuple[str, list, str]]:
     if not message.strip():
         yield "", history, render_chat_telemetry()
         return
@@ -341,8 +357,11 @@ def chat(message: str, history: list) -> Iterator[tuple[str, list, str]]:
     yield "", history, render_chat_telemetry(state=state, ctx_max=ctx_max)
 
     try:
-        stream = client.chat.completions.create(model="local", messages=sent, stream=True,
-                                                stream_options={"include_usage": True})
+        sampling = Sampling(temperature=temperature, top_p=top_p, top_k=int(top_k), min_p=min_p,
+                            presence_penalty=presence_penalty, repeat_penalty=repeat_penalty)
+        request = build_request(system_prompt or "", sent, sampling, max_tokens, thinking)
+        stream = client.chat.completions.create(model="local", stream=True, stream_options={"include_usage": True},
+                                                **request)
         usage = timings = None
         for chunk in stream:
             usage = chunk.usage or usage
@@ -404,7 +423,8 @@ def build() -> gr.Blocks:
                         </div>
                         """)
                         model = gr.Dropdown(choices=model_choices(), value=default_model(), allow_custom_value=True,
-                                            label="Model", info="Local GGUF file or Hugging Face repository.")
+                                            label="Model", info="Tested models, local GGUF files, or any Hugging Face GGUF repo.")
+                        model_card = gr.HTML(model_card_html(default_model()))
                         ctx = gr.Radio(choices=CONTEXT_CHOICES, value=4096, label="Context Length",
                                        info="Higher context allocates more KV cache on the GPU; Fast-MoE shifts upper expert layers into RAM.")
                         margin = gr.Slider(256, 3072, value=1024, step=256, label="GPU Safety Margin (MiB)",
@@ -420,31 +440,69 @@ def build() -> gr.Blocks:
                                           interactive=False)
 
             # TAB 2: Chat Studio
-            with gr.Tab("💬 Chat Studio", id="tab-chat"):
-                with gr.Column(elem_classes=["fm-chat-container"]):
+            with gr.Tab("💬 Chat Studio", id="tab-chat"), gr.Row(equal_height=False):
+                with gr.Column(scale=7, min_width=520, elem_classes=["fm-chat-container"]):
                     gr.HTML("""
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                      <div>
-                        <h2 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-primary);">Local AI Chat Playground</h2>
-                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 0.2rem 0 0 0;">Streaming via OpenAI-compatible API (:8080/v1) with deep reasoning</p>
-                      </div>
+                    <div class="fm-studio-title">
+                      <h2>Local AI Chat Playground</h2>
+                      <p>Streaming from llama-server's OpenAI-compatible API (:8080/v1). Speed and context are measured by the server.</p>
                     </div>
                     """)
-
-                    # Telemetry Cluster HUD
                     chat_hud = gr.HTML(render_chat_telemetry())
-
-                    # Suggested Prompts
                     with gr.Row():
-                        p1 = gr.Button("💡 How does Fast-MoE fit 35B on 6GB?", elem_classes=["fm-chip-btn"], size="sm")
-                        p2 = gr.Button("⚡ Explain Sparse Mixture-of-Experts", elem_classes=["fm-chip-btn"], size="sm")
+                        p1 = gr.Button("💡 How does Fast-MoE fit a 35B model on 6 GB?", elem_classes=["fm-chip-btn"], size="sm")
+                        p2 = gr.Button("⚡ Explain Mixture-of-Experts", elem_classes=["fm-chip-btn"], size="sm")
                         p3 = gr.Button("🐍 Python script to benchmark memory bandwidth", elem_classes=["fm-chip-btn"], size="sm")
-
-                    chatbot = gr.Chatbot(height=460, label="Conversation", show_label=False)
+                    chatbot = gr.Chatbot(height=520, label="Conversation", show_label=False,
+                                         placeholder="Start a model on the Engine tab, then say hello.")
                     with gr.Row():
-                        msg = gr.Textbox(placeholder="Type a message to the running model...", show_label=False, scale=9)
-                        send_btn = gr.Button("Send", variant="primary", scale=1)
-                        clear_btn = gr.Button("Clear", variant="secondary", scale=1)
+                        msg = gr.Textbox(placeholder="Type a message to the running model...", show_label=False, scale=1)
+                        send_btn = gr.Button("Send", variant="primary", scale=0, min_width=110)
+                        clear_btn = gr.Button("Clear", variant="secondary", scale=0, min_width=90)
+
+                with gr.Column(scale=4, min_width=320, elem_classes=["fm-studio-sidebar"]):
+                    with gr.Group(elem_classes=["fm-studio-card", "fm-studio-system"]):
+                        gr.HTML("""
+                        <div class="fm-studio-head">
+                          <span class="fm-studio-icon">🧭</span>
+                          <div><h3>System Prompt</h3><p>Sets the model's role and tone for the whole conversation.</p></div>
+                        </div>
+                        """)
+                        system_preset = gr.Radio(choices=list(SYSTEM_PRESETS), value="Helpful", show_label=False,
+                                                 elem_classes=["fm-segmented"])
+                        system_prompt = gr.Textbox(value=SYSTEM_PRESETS["Helpful"], lines=5, max_lines=12,
+                                                   show_label=False, placeholder="Describe how the assistant should behave...",
+                                                   elem_classes=["fm-system-box"])
+
+                    with gr.Group(elem_classes=["fm-studio-card", "fm-studio-tuning"]):
+                        gr.HTML("""
+                        <div class="fm-studio-head">
+                          <span class="fm-studio-icon">🎛️</span>
+                          <div><h3>Generation Tuning</h3><p>How the model picks each next word. Applies from your next message.</p></div>
+                        </div>
+                        """)
+                        start_sampling, start_note = preset_sampling(MODEL_CARD, default_model())
+                        tuning_preset = gr.Radio(choices=list(TUNING_PRESETS), value=MODEL_CARD, show_label=False,
+                                                 elem_classes=["fm-segmented"])
+                        tuning_note = gr.HTML(f'<p class="fm-tuning-note">{start_note}</p>')
+                        thinking = gr.Checkbox(value=True, label="Reasoning",
+                                               info="Let the model think before answering. Off is faster.",
+                                               elem_classes=["fm-think-toggle"])
+                        temperature = gr.Slider(0.0, 2.0, value=start_sampling.temperature, step=0.05, label="Temperature",
+                                                info="Lower is predictable, higher is inventive.")
+                        top_p = gr.Slider(0.05, 1.0, value=start_sampling.top_p, step=0.01, label="Top-p",
+                                          info="Only consider the most likely words adding up to this share.")
+                        top_k = gr.Slider(0, 200, value=start_sampling.top_k, step=1, label="Top-k",
+                                          info="Only consider this many candidate words (0 = all).")
+                        with gr.Accordion("Advanced", open=False, elem_classes=["fm-advanced"]):
+                            min_p = gr.Slider(0.0, 0.5, value=start_sampling.min_p, step=0.01, label="Min-p",
+                                              info="Drop words far less likely than the top choice.")
+                            presence_penalty = gr.Slider(0.0, 2.0, value=start_sampling.presence_penalty, step=0.05,
+                                                         label="Presence penalty", info="Push toward new topics and words.")
+                            repeat_penalty = gr.Slider(1.0, 2.0, value=start_sampling.repeat_penalty, step=0.01,
+                                                       label="Repeat penalty", info="Discourage repeating recent tokens.")
+                            max_tokens = gr.Slider(256, 32768, value=8192, step=256, label="Max output tokens",
+                                                   info="Reasoning counts toward this limit.")
 
             # TAB 3: Hardware & Benchmarks
             with gr.Tab("📊 Hardware & Benchmarks", id="tab-hardware"):
@@ -472,8 +530,22 @@ def build() -> gr.Blocks:
         apply_btn.click(apply, inputs, [title, board, command], concurrency_limit=1)
         stop_btn.click(stop, None, [title, board])
 
-        msg.submit(chat, [msg, chatbot], [msg, chatbot, chat_hud])
-        send_btn.click(chat, [msg, chatbot], [msg, chatbot, chat_hud])
+        chat_inputs = [msg, chatbot, system_prompt, temperature, top_p, top_k, min_p, presence_penalty,
+                       repeat_penalty, max_tokens, thinking]
+        msg.submit(chat, chat_inputs, [msg, chatbot, chat_hud])
+        send_btn.click(chat, chat_inputs, [msg, chatbot, chat_hud])
+        model.change(model_card_html, model, model_card)
+        system_preset.change(lambda name: SYSTEM_PRESETS[name], system_preset, system_prompt)
+
+        def apply_tuning_preset(preset: str, selected_model: str):
+            running = str(runner.plan.model_path) if runner.running and runner.plan else selected_model
+            s, note = preset_sampling(preset, running)
+            return (s.temperature, s.top_p, s.top_k, s.min_p, s.presence_penalty, s.repeat_penalty,
+                    f'<p class="fm-tuning-note">{note}</p>')
+
+        tuning_outputs = [temperature, top_p, top_k, min_p, presence_penalty, repeat_penalty, tuning_note]
+        tuning_preset.change(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
+        model.change(apply_tuning_preset, [tuning_preset, model], tuning_outputs)
         clear_btn.click(lambda: ([], render_chat_telemetry()), None, [chatbot, chat_hud])
 
         # Quick prompt buttons

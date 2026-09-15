@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Chat Studio sidebar: a System Prompt panel with presets (Helpful, Concise,
+  Coder, Teacher) and a Generation Tuning panel (temperature, top-p, top-k,
+  min-p, presence and repeat penalty, max tokens, reasoning on/off) with a
+  "Model card" preset that applies each model's official recommended settings.
+- Tested-model catalog with a model card under the engine model picker:
+  Qwen3.6-35B-A3B, Gemma 4 26B-A4B and Qwen3-30B-A3B, including models not
+  downloaded yet.
+
 ## [1.0.0] - 2026-09-13
 
 ### Added

@@ -1003,3 +1003,157 @@ body, html {
 .fill-amber { background: var(--amber-bright); }
 .fill-cyan { background: var(--cyan-bright); }
 
+
+/* ==========================================================================
+   Chat Studio: system prompt and generation tuning panels, model card
+   ========================================================================== */
+
+.fm-studio-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); }
+.fm-studio-title p { margin: 0.2rem 0 0; font-size: 0.78rem; color: var(--text-secondary); }
+
+.fm-studio-sidebar { gap: 1rem !important; }
+
+/* Gradio puts a Group's classes on its outer and inner div; style the outer card only. */
+.fm-studio-sidebar > .fm-studio-card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 1rem 1.1rem 1.1rem !important;
+  position: relative;
+  overflow: hidden;
+}
+.fm-studio-sidebar > .fm-studio-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+}
+.fm-studio-sidebar > .fm-studio-system::before { background: var(--violet-bright); }
+.fm-studio-sidebar > .fm-studio-tuning::before { background: var(--cyan-bright); }
+
+.fm-studio-card .fm-studio-card {
+  padding: 0 !important;
+  gap: 0.75rem !important;
+  border: none !important;
+  background: transparent !important;
+}
+.fm-studio-card .fm-studio-card > div,
+.fm-studio-card .block,
+.fm-studio-card .form { background: transparent !important; border: none !important; box-shadow: none !important; }
+
+.fm-studio-head { display: flex; align-items: flex-start; gap: 0.7rem; }
+.fm-studio-head h3 { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+.fm-studio-head p { margin: 0.15rem 0 0; font-size: 0.75rem; line-height: 1.45; color: var(--text-secondary); }
+.fm-studio-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  font-size: 1.05rem;
+}
+.fm-studio-system .fm-studio-icon { background: var(--violet-glow); border: 1px solid rgba(139, 92, 246, 0.4); }
+.fm-studio-tuning .fm-studio-icon { background: var(--cyan-glow); border: 1px solid var(--border-cyan); }
+
+/* Segmented preset pills built from a Gradio Radio */
+.fm-segmented .wrap { display: flex !important; flex-wrap: wrap; gap: 0.4rem !important; }
+.fm-segmented label {
+  position: relative;
+  margin: 0 !important;
+  padding: 0.38rem 0.85rem !important;
+  border-radius: 9999px !important;
+  border: 1px solid var(--border-subtle) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.78rem !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.fm-segmented label:hover { color: var(--text-primary) !important; border-color: var(--border-light) !important; }
+.fm-segmented label input[type="radio"] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.fm-segmented label.selected,
+.fm-segmented label:has(input:checked) {
+  color: var(--cyan-bright) !important;
+  border-color: var(--border-cyan) !important;
+  background: rgba(6, 182, 212, 0.12) !important;
+}
+.fm-studio-system .fm-segmented label.selected,
+.fm-studio-system .fm-segmented label:has(input:checked) {
+  color: #c4b5fd !important;
+  border-color: rgba(139, 92, 246, 0.55) !important;
+  background: rgba(139, 92, 246, 0.14) !important;
+}
+.fm-segmented label:has(input:focus-visible) { outline: 2px solid var(--cyan-bright); outline-offset: 2px; }
+
+.fm-system-box textarea {
+  background: var(--bg-deep) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 0.85rem !important;
+  line-height: 1.55 !important;
+  color: var(--text-primary) !important;
+}
+.fm-system-box textarea:focus { border-color: rgba(139, 92, 246, 0.6) !important; }
+
+.fm-tuning-note {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: rgba(6, 182, 212, 0.06);
+  border: 1px dashed var(--border-cyan);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.fm-think-toggle { padding: 0.2rem 0 !important; }
+.fm-studio-tuning input[type="range"] { accent-color: var(--cyan-bright); }
+.fm-studio-tuning input[type="number"] { font-family: var(--font-mono); }
+.fm-advanced { border-radius: var(--radius-md) !important; border: 1px solid var(--border-subtle) !important; }
+
+/* Model card under the engine model picker */
+.fm-model-card {
+  margin-top: 0.25rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(160deg, rgba(6, 182, 212, 0.07), rgba(139, 92, 246, 0.05));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.fm-model-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.fm-model-name { font-weight: 800; font-size: 0.95rem; color: var(--text-primary); }
+.fm-model-tag {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  color: var(--amber-bright);
+  background: var(--amber-glow);
+  border: 1px solid var(--border-amber);
+  white-space: nowrap;
+}
+.fm-model-tag.ready { color: var(--emerald-bright); background: var(--emerald-glow); border-color: var(--border-emerald); }
+.fm-model-facts { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.fm-model-facts span {
+  font-size: 0.72rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+.fm-model-sampling { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.fm-model-sampling .k { font-size: 0.7rem; color: var(--text-muted); margin-right: 0.15rem; }
+.fm-model-sampling code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 6px;
+  color: var(--cyan-bright);
+  background: rgba(6, 182, 212, 0.1);
+}
+.fm-model-note { margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45; }
+.fm-model-link { align-self: flex-start; font-size: 0.74rem; color: var(--cyan-bright); text-decoration: none; }
+.fm-model-link:hover { text-decoration: underline; text-underline-offset: 3px; }
