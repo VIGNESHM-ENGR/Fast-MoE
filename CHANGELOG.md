@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Tested-model catalog with a model card under the engine model picker:
   Qwen3.6-35B-A3B, Gemma 4 26B-A4B and Qwen3-30B-A3B, including models not
   downloaded yet.
+- Agent skill (`.claude/skills/fast-moe/`) with project rules, setup, change,
+  add-a-model, verification and release procedures, and lessons learned;
+  `AGENTS.md` and `CLAUDE.md` point every coding agent to it.
 
 ## [1.0.0] - 2026-09-13
 
