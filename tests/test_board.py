@@ -12,7 +12,8 @@ GiB = 1024**3
 MiB = 1024**2
 
 
-def plan(gpu_layers: list[int], split: list[int], ram: list[int], ctx=4096, path="/m/a.gguf", no_mmap=False):
+def plan(gpu_layers: list[int], split: list[int], ram: list[int], ctx=4096, path="/m/a.gguf", no_mmap=False,
+         ngl=None):
     placement = []
     for layer in sorted(gpu_layers + split + ram):
         g = 300 * MiB if layer in gpu_layers else 100 * MiB if layer in split else 0
@@ -22,7 +23,7 @@ def plan(gpu_layers: list[int], split: list[int], ram: list[int], ctx=4096, path
     layout = ModelLayout("qwen35moe", n, 256, 8, 262144, 20 * GiB,
                          tuple(ExpertTensor(f"blk.{i}.ffn_up_exps.weight", i, 300 * MiB) for i in range(n)),
                          embedding_bytes=600 * MiB)
-    fit = parse_fit_args(f"-c {ctx} -ngl {n + 1}")
+    fit = parse_fit_args(f"-c {ctx} -ngl {n + 1 if ngl is None else ngl}")
     return RunPlan(RunSettings(no_mmap=no_mmap), Path(path), layout, fit, tuple(placement), ())
 
 
@@ -110,3 +111,28 @@ def test_cpu_only_plan_does_not_claim_the_gpu_holds_anything():
     html = render_board(BoardView(state="unpowered", gpu_name=None, gpu_total=0, ram_total=38 * GiB, plan=cpu))
     assert "GPU holds" not in html
     assert "262,144 tokens (in RAM)" in html
+
+
+def test_layers_left_off_the_gpu_are_flagged_with_the_context_that_caused_it():
+    # Gemma 4 at 64K: -ngl 25 of 30 layers leaves layers 0-5 fully on the CPU.
+    slow = plan([], [], list(range(30)), ctx=65536, ngl=25)
+    html = render_board(view(slow))
+    assert "At 65,536 tokens of context, layers 0-5 run entirely on the CPU" in html
+    assert summary_sentence(slow).startswith("Layers 6-29 run in System RAM. Layers 0-5 run entirely on the CPU.")
+    assert html.count("fm-layer-item layer-cpu") == 6
+    assert "CPU only (attention too)" in html
+    fine = render_board(view(plan([0, 1], [2], [3, 4])))
+    assert "fm-warning-card" not in fine and "layer-cpu" not in fine
+
+
+def test_cpu_only_plan_has_no_slow_layer_warning():
+    cpu = replace(plan([], [], [0, 1, 2]), fit=parse_fit_args("-c 4096"))
+    assert "fm-warning-card" not in render_board(view(cpu))
+
+
+def test_ram_tier_shows_the_model_file_held_in_page_cache():
+    html = render_board(view(plan([0], [], [1]), ram_used=2 * GiB, model_cached=int(16.7 * GiB)))
+    assert "2.0 GB + 16.7 GB model / 38.0 GB" in html
+    assert "fill-cache" in html and "16.70 GiB" in html
+    idle = render_board(view(plan([0], [], [1]), ram_used=2 * GiB))
+    assert "fill-cache" not in idle and "2.0 GB / 38.0 GB" in idle

@@ -41,13 +41,26 @@ Measured on an ASUS TUF laptop: **RTX 3060 Laptop GPU (6 GB)**, Intel i5-11400H,
 
 <sub>One machine, one run each; your numbers will differ. Benchmarks against hand-tuned llama.cpp are on the roadmap.</sub>
 
+### How much context before it slows down
+
+A longer context needs a bigger KV cache on the GPU, so llama.cpp moves experts to RAM and, past a point, whole layers (attention too) onto the CPU. Each model's default context in the dashboard is the largest one measured before that happens. 256-token answers with reasoning off, same laptop, `benchmarks/bench_context.py`:
+
+| Context | Qwen3.6-35B-A3B | Gemma 4 26B-A4B |
+|---|---|---|
+| 4K | 22.1 tokens/s | 15.4 tokens/s |
+| 16K | 21.5 tokens/s | 14.8 tokens/s |
+| 32K | 21.2 tokens/s | **14.7 tokens/s** (default) |
+| 64K | **20.6 tokens/s** (default) | 10.4 tokens/s: layers 0–5 fall back to the CPU |
+
+**Why the GPU looks idle.** During writing, the CPU computes the experts that live in RAM for every token (all 6 cores busy) while the GPU waits on it: GPU utilisation was 19–26 %, and 11 % once Gemma's layers fell to the CPU. That is expected for Mixture-of-Experts offloading; the GPU's job here is holding the always-used weights and the KV cache. System RAM can also look empty: the model file sits in the OS page cache, which Linux doesn't count as "used", so the dashboard shows it separately.
+
 ## What you see
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-**Every layer, mapped.** Orange layers run on the GPU, green ones from RAM, purple ones are split between the two. Hover any layer for its exact size. Change the context length and the preview shows which layers move off the GPU *before* you restart anything.
+**Every layer, mapped.** Orange layers run on the GPU, green ones from RAM, purple ones are split between the two. Hover any layer for its exact size. Change the context length and the preview shows which layers move off the GPU *before* you restart anything, with a warning when whole layers would run on the CPU.
 
 </td>
 <td width="50%" valign="top">
@@ -80,6 +93,7 @@ git clone https://github.com/VIGNESHM-ENGR/Fast-MoE.git && cd Fast-MoE
 | `./start.sh cpu` | CPU only, no GPU needed |
 | `./start.sh --no-browser` | don't open the browser |
 | `./start.sh --no-build` | reuse the already-built image |
+| `./start.sh --ram-limit 20g` | cap the container's RAM (default: no cap) |
 
 In the dashboard, pick a model, press **Preview Placement**, then **Apply & Start**. The model downloads on first use (Qwen3.6-35B-A3B is 19 GiB) into `./models`.
 
@@ -189,7 +203,7 @@ Each runs with its model card's recommended sampling by default. Other Mixture-o
 
 - [x] One-command launcher, dashboard, Docker (GPU and CPU), CI
 - [ ] Benchmarks against hand-tuned `--n-cpu-moe` on the same hardware
-- [ ] Recommended context length per model, from measurements
+- [x] Recommended context length per model, from measurements
 - [ ] Live per-expert activity (needs routing statistics llama.cpp does not expose yet)
 - [ ] Models larger than RAM: measure how far NVMe paging stretches
 

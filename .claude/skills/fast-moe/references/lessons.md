@@ -61,6 +61,16 @@ Each lesson was hit for real while building Fast-MoE: the symptom, the cause, th
   prompt tok/s; `--load-mode none` loads in 29 s at 235 prompt tok/s; decode speed is the same.
   mmap stays the default because it lets the OS page weights from NVMe.
 - **Default slots** are auto (4) sharing one unified KV cache; `-np 1` changed nothing measurable.
+- **"RAM is empty" while a model runs** is the mmap page cache: the model shows as buff/cache in
+  `free` and as `RssFile` in `/proc/<llama-server pid>/status`, not as used memory. The dashboard
+  reads `RssFile`; psutil's `total - available` alone looks empty.
+- **CPU pegged, GPU at 5-13 % during decode** is normal for MoE offload: the CPU computes the
+  RAM-side experts for every token and the GPU waits. A large context makes it worse: at 64K,
+  Gemma 4 fit to `-ngl 25` of 30 layers, so layers 0-5 ran entirely on the CPU, attention too
+  (`cpu_attention_layers` in `engine/llama/runner.py`).
+- **A container RAM cap does not break mmap**: page cache counts toward `memory.max` but is
+  reclaimable, so the kernel re-reads expert pages from disk. Compose drops `mem_limit: 0`,
+  which is how `${FAST_MOE_RAM_LIMIT:-0}` means no cap.
 
 ## Hugging Face downloads
 

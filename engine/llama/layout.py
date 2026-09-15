@@ -75,6 +75,11 @@ def read_layout(path: Path) -> ModelLayout:
     )
 
 
+def layers_fully_on_cpu(layout: ModelLayout, gpu_layers: int) -> list[int]:
+    """Layers `-ngl` leaves off the GPU entirely: attention and KV cache run on the CPU too."""
+    return list(range(max(layout.block_count + 1 - gpu_layers, 0)))
+
+
 def expert_placement(layout: ModelLayout, gpu_layers: int, cpu_patterns: tuple[str, ...]) -> tuple[LayerPlacement, ...]:
     first_gpu_layer = max(layout.block_count + 1 - gpu_layers, 0)
     patterns = [re.compile(p) for p in cpu_patterns]

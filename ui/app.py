@@ -89,12 +89,17 @@ def settings_from(model: str, ctx: int, margin: int, mmap: bool) -> RunSettings:
     return RunSettings(model=model, ctx=int(ctx), vram_margin_mib=int(margin), no_mmap=not mmap)
 
 
+def server_pid() -> int | None:
+    return runner.server.proc.pid if runner.running else None
+
+
 def board_html(message: str | None = None) -> str:
-    usage = read_usage(GPU.index if GPU else None, None)
+    usage = read_usage(GPU.index if GPU else None, None, server_pid())
     return render_board(BoardView(
         state=panel["state"], gpu_name=GPU.name if GPU else None, gpu_total=GPU.total_bytes if GPU else 0,
         ram_total=RAM_TOTAL, plan=panel["plan"], previous=panel["previous"],
-        vram_used=usage.vram_used, ram_used=usage.ram_used, message=message or panel["message"]))
+        vram_used=usage.vram_used, ram_used=usage.ram_used, model_cached=usage.model_cached,
+        message=message or panel["message"]))
 
 
 def title_html() -> str:
@@ -178,7 +183,7 @@ def stop() -> tuple[str, str]:
 
 
 def meters_html() -> str:
-    usage = read_usage(GPU.index if GPU else None, runner.server.url if runner.running else None)
+    usage = read_usage(GPU.index if GPU else None, runner.server.url if runner.running else None, server_pid())
 
     def meter_card(title: str, val: str, sub: str, frac: float | None, fill_cls: str) -> str:
         bar = (f'<div class="fm-meter-bar"><div class="fm-meter-fill {fill_cls}" '
@@ -199,7 +204,8 @@ def meters_html() -> str:
                        usage.vram_used / usage.vram_total, "fill-gpu")
             if usage.vram_total else meter_card("GPU VRAM", "No GPU", "CPU mode", None, ""))
     ram = meter_card("System RAM", f"{usage.ram_used / GiB:.1f} / {usage.ram_total / GiB:.1f} GB",
-                     f"{usage.ram_used / usage.ram_total * 100:.0f}% in use",
+                     f"{usage.ram_used / usage.ram_total * 100:.0f}% in use"
+                     + (f" + {usage.model_cached / GiB:.1f} GB model file cached" if usage.model_cached else ""),
                      usage.ram_used / usage.ram_total, "fill-ram")
     gen_val = f"{usage.gen_tps:.1f} tok/s" if usage.gen_tps else "Idle"
     prompt_val = f"{usage.prompt_tps:.0f} tok/s" if usage.prompt_tps else "Idle"
@@ -427,8 +433,9 @@ def build() -> gr.Blocks:
                         model = gr.Dropdown(choices=model_choices(), value=default_model(), allow_custom_value=True,
                                             label="Model", info="Tested models, local GGUF files, or any Hugging Face GGUF repo.")
                         model_card = gr.HTML(model_card_html(default_model()))
-                        ctx = gr.Radio(choices=CONTEXT_CHOICES, value=4096, label="Context Length",
-                                       info="Higher context allocates more KV cache on the GPU; Fast-MoE shifts upper expert layers into RAM.")
+                        ctx = gr.Radio(choices=CONTEXT_CHOICES, value=catalog.default_ctx(default_model()),
+                                       label="Context Length",
+                                       info="More context needs more KV cache on the GPU, so more experts move to RAM and, past a point, whole layers run on the CPU.")
                         margin = gr.Slider(256, 3072, value=1024, step=256, label="GPU Safety Margin (MiB)",
                                            info="Reserved VRAM for desktop display and OS buffers.")
                         mmap = gr.Checkbox(value=True, label="Zero-Copy Memory-Mapped (mmap)",
@@ -537,6 +544,7 @@ def build() -> gr.Blocks:
         msg.submit(chat, chat_inputs, [msg, chatbot, chat_hud])
         send_btn.click(chat, chat_inputs, [msg, chatbot, chat_hud])
         model.change(model_card_html, model, model_card)
+        model.change(catalog.default_ctx, model, ctx)
         system_preset.change(lambda name: SYSTEM_PRESETS[name], system_preset, system_prompt)
 
         def apply_tuning_preset(preset: str, selected_model: str):

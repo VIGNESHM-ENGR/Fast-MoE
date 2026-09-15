@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from html import escape
 
 from engine.llama.layout import LayerPlacement, describe_ranges
-from engine.llama.runner import RunPlan
+from engine.llama.runner import RunPlan, context_warning, cpu_attention_layers
 
 GiB = 1024**3
 MiB = 1024**2
@@ -35,6 +35,7 @@ class BoardView:
     previous: RunPlan | None = None  # last applied plan, to show what moved
     vram_used: int | None = None
     ram_used: int | None = None
+    model_cached: int | None = None  # model file pages llama-server holds in RAM (page cache)
     message: str | None = None
 
 
@@ -49,15 +50,16 @@ def _size(n: float) -> str:
 def summary_sentence(plan: RunPlan) -> str:
     """One plain sentence a first-time user can read immediately."""
     p = plan.placement
+    cpu = cpu_attention_layers(plan)
     gpu = [x.layer for x in p if x.gpu_bytes and not x.cpu_bytes]
     split = [x.layer for x in p if x.gpu_bytes and x.cpu_bytes]
-    ram = [x.layer for x in p if x.cpu_bytes and not x.gpu_bytes]
+    ram = [x.layer for x in p if x.cpu_bytes and not x.gpu_bytes and x.layer not in cpu]
     total = len(p)
     ctx = plan.fit.context or plan.layout.context_length
     parts = []
-    if not ram and not split:
+    if not ram and not split and not cpu:
         parts.append(f"All {total} layers fit on the GPU (fastest execution).")
-    elif not gpu and not split:
+    elif not gpu and not split and not cpu:
         if plan.fit.gpu_layers:
             parts.append(f"The experts of all {total} layers run from System RAM; GPU holds attention and KV cache.")
         else:
@@ -69,6 +71,8 @@ def summary_sentence(plan: RunPlan) -> str:
             parts.append(f"Layer {describe_ranges(split)} is split between GPU and RAM.")
         if ram:
             parts.append(f"Layers {describe_ranges(ram)} run in System RAM.")
+        if cpu:
+            parts.append(f"Layers {describe_ranges(cpu)} run entirely on the CPU.")
     parts.append(f"Active context: {ctx:,} tokens.")
     return " ".join(parts)
 
@@ -110,13 +114,18 @@ def render_titleblock(state: str, gpu_name: str | None, gpu_total: int, ram_tota
     """
 
 
-def _meter(used: int | None, total: int, fill_cls: str, label: str) -> str:
+def _meter(used: int | None, total: int, fill_cls: str, label: str, cached: int | None = None) -> str:
     frac = min(used / total, 1.0) if used is not None and total else 0.0
     value = f"{_gb(used)} / {_gb(total)}" if used is not None and total else UNKNOWN
+    cache_fill = ""
+    if cached and used is not None and total:
+        value = f"{_gb(used)} + {_gb(cached)} model / {_gb(total)}"
+        cache_frac = min(cached / total, 1.0 - frac)
+        cache_fill = f'<div class="fm-meter-fill fill-cache" style="width: {cache_frac * 100:.1f}%;"></div>'
     return f"""
         <div class="fm-tier-meter">
           <div class="fm-meter-bar">
-            <div class="fm-meter-fill {fill_cls}" style="width: {frac * 100:.1f}%;"></div>
+            <div class="fm-meter-fill {fill_cls}" style="width: {frac * 100:.1f}%;"></div>{cache_fill}
           </div>
           <div class="fm-meter-labels">
             <span>{escape(label)}</span>
@@ -213,9 +222,11 @@ def _tiers(view: BoardView, gpu_parts: list[LayerPlacement], ram_parts: list[Lay
             <p>System memory</p>
           </div>
         </div>
-        {_meter(view.ram_used, view.ram_total, "fill-ram", "In use")}
+        {_meter(view.ram_used, view.ram_total, "fill-ram", "In use", view.model_cached)}
         <div class="fm-tier-contents">
           {_row("Expert layers:", ram_layers if plan else UNKNOWN)}
+          {_row("Model file in RAM:", _size(view.model_cached) if view.model_cached else UNKNOWN,
+                "Memory-mapped model pages. Linux counts them as cache, not used, and can free them.")}
           {_row("Token embeddings:", _size(layout.embedding_bytes) if layout else UNKNOWN,
                 "llama.cpp always keeps input embeddings on the CPU")}
         </div>
@@ -304,8 +315,12 @@ def _matrix(plan: RunPlan | None, moving: set[int]) -> str:
     </div>
     """
     chips = []
+    cpu_attention = set(cpu_attention_layers(plan))
     for p in plan.placement:
-        if p.gpu_bytes and not p.cpu_bytes:
+        if p.layer in cpu_attention:
+            cls, label = "layer-cpu", "CPU"
+            desc = f"L{p.layer:02d} entirely on the CPU, attention included ({_size(p.cpu_bytes)} experts)"
+        elif p.gpu_bytes and not p.cpu_bytes:
             cls, label, desc = "layer-gpu", "GPU", f"L{p.layer:02d} in VRAM ({_size(p.gpu_bytes)})"
         elif p.gpu_bytes and p.cpu_bytes:
             cls, label = "layer-split", "SPLIT"
@@ -327,6 +342,8 @@ def _matrix(plan: RunPlan | None, moving: set[int]) -> str:
           <div class="fm-legend-item"><span class="fm-legend-chip chip-gpu"></span><span>GPU VRAM (Hot)</span></div>
           <div class="fm-legend-item"><span class="fm-legend-chip chip-split"></span><span>Split Layer</span></div>
           <div class="fm-legend-item"><span class="fm-legend-chip chip-ram"></span><span>System RAM (Warm)</span></div>
+          {'<div class="fm-legend-item"><span class="fm-legend-chip chip-cpu"></span><span>CPU only (attention too)</span></div>'
+           if cpu_attention else ""}
         </div>
       </div>
       <div class="fm-layer-grid">{"".join(chips)}</div>
@@ -348,8 +365,12 @@ def render_board(view: BoardView) -> str:
 
     caption = view.message or (summary_sentence(plan) if plan
                                else "Click 'Preview Placement' to see where the model fits, or 'Apply & Start' to run it.")
+    warning = context_warning(plan) if plan else None
+    warning_card = (f'<div class="fm-summary-card fm-warning-card"><div class="icon">⚠️</div>'
+                    f'<div><strong>Slow layers:</strong> {escape(warning)}</div></div>') if warning else ""
     return f"""
     <div class="fm-visualizer-wrapper">
+      {warning_card}
       {_explainer(plan, len(gpu_parts), len(split_parts), len(ram_parts), gpu_bytes, ram_bytes)}
       {_tiers(view, gpu_parts, ram_parts, gpu_bytes, ram_bytes)}
       {_gpu_layers_section(plan, gpu_parts, split_parts) if plan else ""}

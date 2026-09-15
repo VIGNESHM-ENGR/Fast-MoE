@@ -80,8 +80,15 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 - [x] Verified on Qwen3.6-35B-A3B through the UI (see M6)
 - [x] Restart with new settings without exiting: `Runner.launch(plan)` after a
       fit made with no server running (a running server would skew free VRAM)
-- [ ] Pick the default `--ctx` for Qwen3.6 from measurements (its KV cache is
-      ~4x smaller per token)
+- [x] Pick the default context per model from measurements
+      (`benchmarks/bench_context.py`, 256 tokens, reasoning off, RTX 3060 Laptop):
+      Qwen3.6 22.1 / 21.5 / 21.2 / 20.6 tok/s at 4K / 16K / 32K / 64K with every
+      layer on the GPU → default 64K; Gemma 4 15.4 / 14.8 / 14.7 tok/s to 32K,
+      then 10.4 tok/s at 64K where `-ngl 25` leaves layers 0-5 on the CPU →
+      default 32K. GPU utilisation 19-26 % (11 % with CPU layers): decode waits
+      on CPU expert compute
+- [x] Warn when the context leaves whole layers on the CPU (board card, red
+      `CPU` chips, CLI plan line)
 
 ## M6 — Gradio UI
 
@@ -95,6 +102,9 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
       layers moved off the GPU vs. the previous plan
 - [x] Resources: VRAM (NVML), RAM (psutil), prompt/generation tok/s from
       `/metrics`
+- [x] RAM meter shows the memory-mapped model held in page cache
+      (llama-server `RssFile`; Gemma 4: 16.7 GB) instead of looking empty, and
+      reads a container's own cgroup usage under a memory limit
 - [x] Chat with reasoning folded into a "Thinking" section; TTFT and phase
       timers, generation speed and context use taken from llama-server's
       own `timings` and `usage`
@@ -132,6 +142,8 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
       dashboard, opens the browser, Ctrl+C runs `docker compose down`. Verified:
       auto chose GPU, cpu, busy port refused, hidden GPU (gpu refuses, auto falls
       back to CPU); shutdown with Qwen3.6 running took 1.7 s and freed the GPU
+- [x] `./start.sh --ram-limit 20g` / `FAST_MOE_RAM_LIMIT`: compose `mem_limit`
+      and `memswap_limit`; unset means no cap
 - Not planned: publishing images to a registry. Users build locally with `docker compose up`.
 
 ## M8 — Benchmarks

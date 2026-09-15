@@ -388,6 +388,7 @@ body, html {
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
   position: relative;
+  display: flex;
 }
 
 .fm-meter-fill {
@@ -399,6 +400,11 @@ body, html {
 .fill-gpu { background: linear-gradient(90deg, #f97316, #f59e0b); }
 .fill-ram { background: linear-gradient(90deg, var(--emerald-bright), #34d399); }
 .fill-ssd { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+/* Page cache holding the memory-mapped model: hatched, since the OS can reclaim it. */
+.fill-cache {
+  background: repeating-linear-gradient(135deg, rgba(52, 211, 153, 0.45) 0 4px, rgba(52, 211, 153, 0.2) 4px 8px);
+  border-radius: 0 9999px 9999px 0;
+}
 
 .fm-meter-labels {
   display: flex;
@@ -575,6 +581,7 @@ body, html {
 .chip-gpu { background: #f97316; box-shadow: 0 0 6px var(--amber-glow); }
 .chip-split { background: var(--violet-bright); box-shadow: 0 0 6px var(--violet-glow); }
 .chip-ram { background: var(--emerald-bright); box-shadow: 0 0 6px var(--emerald-glow); }
+.chip-cpu { background: #f43f5e; box-shadow: 0 0 6px rgba(244, 63, 94, 0.45); }
 
 .fm-layer-grid {
   display: grid;
@@ -634,6 +641,16 @@ body, html {
   border-color: var(--emerald-bright);
 }
 
+.fm-layer-item.layer-cpu {
+  border-color: rgba(244, 63, 94, 0.6);
+  background: rgba(244, 63, 94, 0.08);
+  color: #fb7185;
+}
+.fm-layer-item.layer-cpu:hover {
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.45);
+  border-color: #fb7185;
+}
+
 .fm-layer-item .idx {
   font-weight: 700;
 }
@@ -657,6 +674,11 @@ body, html {
   font-size: 0.85rem;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.fm-warning-card {
+  background: rgba(244, 63, 94, 0.07);
+  border-color: rgba(244, 63, 94, 0.45);
 }
 
 .fm-summary-card .icon {

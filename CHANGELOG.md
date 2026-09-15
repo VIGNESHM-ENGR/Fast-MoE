@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Warning when the chosen context pushes whole layers, attention and KV cache
+  included, onto the CPU: a card above the board, red `CPU` chips in the layer
+  map, and a line in `python -m engine.serve`'s plan.
+- `./start.sh --ram-limit 20g` (or `FAST_MOE_RAM_LIMIT`) caps the container's
+  RAM; the dashboard reads the cap as total RAM.
+- `benchmarks/bench_context.py`: decode speed, GPU utilisation and placement
+  at several context sizes.
+
+### Fixed
+- System RAM looked empty while a model ran: the memory-mapped model file sits
+  in the page cache, which Linux does not count as used. The RAM meter now shows
+  the model file held in RAM (llama-server's `RssFile`) next to used memory, and
+  inside a memory-limited container it reports the container's own usage.
+
 ## [1.1.0] - 2026-09-15
 
 ### Added

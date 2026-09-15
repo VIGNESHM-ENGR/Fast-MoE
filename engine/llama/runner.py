@@ -12,7 +12,14 @@ from functools import lru_cache
 from pathlib import Path
 
 from engine.llama.fit import FitResult, run_fit_params
-from engine.llama.layout import LayerPlacement, ModelLayout, expert_placement, read_layout
+from engine.llama.layout import (
+    LayerPlacement,
+    ModelLayout,
+    describe_ranges,
+    expert_placement,
+    layers_fully_on_cpu,
+    read_layout,
+)
 from engine.llama.server import LlamaServer, ServerError, find_binary, port_in_use
 from engine.models.model_downloader import DEFAULT_QUANT, DEFAULT_REPO, download, local_model
 
@@ -40,6 +47,21 @@ class RunPlan:
     fit: FitResult
     placement: tuple[LayerPlacement, ...]
     server_args: tuple[str, ...]
+
+
+def cpu_attention_layers(plan: RunPlan) -> list[int]:
+    """Layers the GPU skips entirely even though others are offloaded (empty in CPU-only mode)."""
+    return layers_fully_on_cpu(plan.layout, plan.fit.gpu_layers) if plan.fit.gpu_layers else []
+
+
+def context_warning(plan: RunPlan) -> str | None:
+    layers = cpu_attention_layers(plan)
+    if not layers:
+        return None
+    ctx = plan.fit.context or plan.layout.context_length
+    return (f"At {ctx:,} tokens of context, layers {describe_ranges(layers)} run entirely on the CPU, "
+            "attention and KV cache included, which slows every token. "
+            "A smaller context leaves VRAM to keep them on the GPU.")
 
 
 def resolve_model(model: str, quant: str) -> Path:

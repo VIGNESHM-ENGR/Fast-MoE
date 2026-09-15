@@ -31,6 +31,8 @@ class CatalogModel:
     experts: str
     recommended: Sampling
     card_url: str
+    # Largest context measured before decode slows (benchmarks/bench_context.py, 6 GB RTX 3060 Laptop).
+    default_ctx: int = 4096
 
 
 CATALOG: tuple[CatalogModel, ...] = (
@@ -45,6 +47,7 @@ CATALOG: tuple[CatalogModel, ...] = (
         # Model card, thinking mode for general tasks.
         recommended=Sampling(temperature=1.0, top_p=0.95, top_k=20, min_p=0.0, presence_penalty=1.5),
         card_url="https://huggingface.co/Qwen/Qwen3.6-35B-A3B",
+        default_ctx=65536,  # 22.1 tok/s at 4K, 20.6 at 64K; every layer stays on the GPU
     ),
     CatalogModel(
         name="Gemma 4 26B-A4B",
@@ -56,6 +59,7 @@ CATALOG: tuple[CatalogModel, ...] = (
         experts="128 experts · 8 active + 1 shared",
         recommended=Sampling(temperature=1.0, top_p=0.95, top_k=64),
         card_url="https://huggingface.co/google/gemma-4-26B-A4B-it",
+        default_ctx=32768,  # 14.7 tok/s; at 64K layers 0-5 fall to the CPU and speed drops to 10.4
     ),
     CatalogModel(
         name="Qwen3-30B-A3B",
@@ -70,6 +74,11 @@ CATALOG: tuple[CatalogModel, ...] = (
         card_url="https://huggingface.co/Qwen/Qwen3-30B-A3B",
     ),
 )
+
+
+def default_ctx(model: str | Path | None) -> int:
+    entry = find(model)
+    return entry.default_ctx if entry else 4096
 
 
 def find(model: str | Path | None) -> CatalogModel | None:
