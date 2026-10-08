@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `./start.sh --nx` for the Jetson Orin NX 16 GB: no Docker; it sets up `.venv`,
+  builds llama.cpp for Orin once and serves Qwen3.6-35B-A3B with only attention
+  and the KV cache on the GPU (2.7 GiB) and every expert memory-mapped from the
+  SSD. Arguments after `--` go to llama-server. Guide: `docs/jetson-orin-nx.md`.
+  Not yet run on a Jetson; a laptop stand-in limited to 3.3 GB of RAM decoded
+  0.7–1.9 tokens/s.
+- `python -m engine.serve --cpu-moe`: keep every expert in RAM at a fixed context.
+- `docs/livekit.md`: use the API as the LLM of a LiveKit voice agent (tested
+  with livekit-agents 1.8.5: streaming, tool calls, API key).
+- `python3 models/downloader.py`: pick catalog models with the space bar and
+  download them; installs `huggingface_hub` first if it is missing.
 - Warning when the chosen context pushes whole layers, attention and KV cache
   included, onto the CPU: a card above the board, red `CPU` chips in the layer
   map, and a line in `python -m engine.serve`'s plan.
@@ -21,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Thinking block collapses with its duration once the answer starts.
 
 ### Fixed
+- `scripts/build_llama_cpp.sh` now builds `llama-fit-params`, which a fresh
+  native build lacked.
+- A plan with `-ngl -1` (all layers) was read as no layers on the GPU and
+  warned that every layer ran on the CPU.
 - Chat Studio's Reasoning switch had no effect: the request always asked for
   reasoning. Turning it off now sends `enable_thinking: false`.
 - Tuning sliders showed the dropdown model's settings instead of the running

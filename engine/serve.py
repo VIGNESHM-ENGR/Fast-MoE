@@ -54,11 +54,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--vram-margin-mib", type=int, help="VRAM to leave free (llama.cpp default 1024)")
     parser.add_argument("--no-mmap", action="store_true",
                         help="load weights into RAM instead of memory-mapping (faster prompts, slower start)")
+    parser.add_argument("--cpu-moe", action="store_true",
+                        help="keep every expert memory-mapped in RAM, paged from disk, at exactly --ctx "
+                             "tokens (for unified memory, e.g. Jetson)")
     parser.add_argument("llama_args", nargs=argparse.REMAINDER, help="extra llama-server arguments after `--`")
     args = parser.parse_args(argv)
     ctx = args.ctx or catalog.default_ctx(args.model)
     settings = RunSettings(args.model, args.quant, args.host, args.port, ctx,
-                           args.vram_margin_mib, args.no_mmap, tuple(args.llama_args))
+                           args.vram_margin_mib, args.no_mmap, args.cpu_moe, tuple(args.llama_args))
 
     runner = Runner()
     try:

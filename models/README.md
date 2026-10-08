@@ -1,7 +1,13 @@
 # models/
 
-Downloaded GGUF weights live here (everything except this README is
-git-ignored). Fetch the default model with:
+Downloaded GGUF weights live here (everything except this README and
+`downloader.py` is git-ignored). To pick models from a list, run:
+
+```bash
+python3 models/downloader.py   # space selects, enter downloads; installs huggingface_hub if missing
+```
+
+Or fetch one model from the command line:
 
 ```bash
 python -m engine.models.model_downloader                 # ggml-org/Qwen3.6-35B-A3B-GGUF, Q4_K_M (19.0 GiB)

@@ -75,13 +75,18 @@ def read_layout(path: Path) -> ModelLayout:
     )
 
 
+def _first_gpu_layer(layout: ModelLayout, gpu_layers: int) -> int:
+    # -ngl offloads the last N layers; a negative N (auto/all) offloads all n_layer + 1.
+    return 0 if gpu_layers < 0 else max(layout.block_count + 1 - gpu_layers, 0)
+
+
 def layers_fully_on_cpu(layout: ModelLayout, gpu_layers: int) -> list[int]:
     """Layers `-ngl` leaves off the GPU entirely: attention and KV cache run on the CPU too."""
-    return list(range(max(layout.block_count + 1 - gpu_layers, 0)))
+    return list(range(_first_gpu_layer(layout, gpu_layers)))
 
 
 def expert_placement(layout: ModelLayout, gpu_layers: int, cpu_patterns: tuple[str, ...]) -> tuple[LayerPlacement, ...]:
-    first_gpu_layer = max(layout.block_count + 1 - gpu_layers, 0)
+    first_gpu_layer = _first_gpu_layer(layout, gpu_layers)
     patterns = [re.compile(p) for p in cpu_patterns]
     gpu = dict.fromkeys(range(layout.block_count), 0)
     cpu = dict.fromkeys(range(layout.block_count), 0)

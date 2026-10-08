@@ -4,7 +4,13 @@ import socket
 import pytest
 
 from engine.llama.fit import FitError, parse_fit_args
-from engine.llama.layout import ExpertTensor, ModelLayout, describe_ranges, expert_placement
+from engine.llama.layout import (
+    ExpertTensor,
+    ModelLayout,
+    describe_ranges,
+    expert_placement,
+    layers_fully_on_cpu,
+)
 from engine.llama.server import ServerError, find_binary, port_in_use
 
 MiB = 1024**2
@@ -51,6 +57,16 @@ def test_layers_not_offloaded_keep_experts_on_cpu():
     # -ngl 5 on 12 blocks offloads the last layers only (i_gpu_start = 12 + 1 - 5 = 8)
     placement = expert_placement(layout(), gpu_layers=5, cpu_patterns=())
     assert [p.layer for p in placement if p.gpu_bytes] == [8, 9, 10, 11]
+
+
+
+def test_negative_ngl_means_every_layer_on_the_gpu():
+    # llama-fit-params --cpu-moe prints `-ngl -1`; llama.cpp offloads n_layer + 1 for any negative value.
+    fit = parse_fit_args('-c 8192 -ngl -1 -ot "\\.ffn_(up|down|gate|gate_up)_(ch|)exps=CPU"')
+    assert layers_fully_on_cpu(layout(), fit.gpu_layers) == []
+    placement = expert_placement(layout(), fit.gpu_layers, fit.cpu_patterns)
+    assert all(p.gpu_bytes == 0 and p.cpu_bytes == 373 * MiB for p in placement)
+    assert [p.layer for p in expert_placement(layout(), -1, ()) if p.cpu_bytes] == []
 
 
 def test_describe_ranges():

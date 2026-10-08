@@ -36,6 +36,9 @@ class RunSettings:
     ctx: int | None = None
     vram_margin_mib: int | None = None
     no_mmap: bool = False
+    # Every expert stays memory-mapped in RAM (paged from disk), at exactly `ctx` tokens.
+    # For unified memory (Jetson), where GPU buffers are pinned RAM the page cache can't use.
+    cpu_moe: bool = False
     extra_args: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -85,9 +88,11 @@ def layout_for(path: Path) -> ModelLayout:
 
 
 def fit_params_args(settings: RunSettings) -> list[str]:
-    args = []
+    args = ["--cpu-moe"] if settings.cpu_moe else []
     if settings.ctx:
-        args += ["--fit-ctx", str(settings.ctx)]
+        # --fit-ctx is a minimum fit grows to fill the GPU; with --cpu-moe that growth would be
+        # KV cache taking the RAM the experts are paged into, so fix the context instead.
+        args += ["-c" if settings.cpu_moe else "--fit-ctx", str(settings.ctx)]
     if settings.vram_margin_mib is not None:
         args += ["--fit-target", str(settings.vram_margin_mib)]
     return args

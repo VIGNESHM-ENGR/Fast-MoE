@@ -25,6 +25,13 @@ def test_fit_params_args_map_user_settings():
         "--fit-ctx", "32768", "--fit-target", "512"]
 
 
+def test_cpu_moe_keeps_experts_in_ram_at_a_fixed_context():
+    # --fit-ctx is a minimum that fit grows to fill the GPU; on unified memory that would
+    # take the RAM the memory-mapped experts need, so the context is fixed with -c.
+    assert r.fit_params_args(r.RunSettings(ctx=8192, cpu_moe=True)) == ["--cpu-moe", "-c", "8192"]
+    assert r.fit_params_args(r.RunSettings(cpu_moe=True)) == ["--cpu-moe"]
+
+
 def test_plan_run_combines_fit_and_layout(monkeypatch, tmp_path):
     model = tmp_path / "m.gguf"
     model.write_bytes(b"x")

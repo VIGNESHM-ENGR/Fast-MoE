@@ -95,6 +95,7 @@ git clone https://github.com/VIGNESHM-ENGR/Fast-MoE.git && cd Fast-MoE
 | `./start.sh --no-browser` | don't open the browser |
 | `./start.sh --no-build` | reuse the already-built image |
 | `./start.sh --ram-limit 20g` | cap the container's RAM (default: no cap) |
+| `./start.sh --nx` | Jetson Orin NX 16 GB: native, no Docker, experts read from the SSD ([guide](docs/jetson-orin-nx.md)) |
 
 In the dashboard, pick a model, press **Preview Placement**, then **Apply & Start**. The model downloads on first use (Qwen3.6-35B-A3B is 19 GiB) into `./models`.
 
@@ -123,7 +124,9 @@ python -m ui.app               # dashboard at http://127.0.0.1:7860
 # or headless:  python -m engine.serve
 ```
 
-Any OpenAI-compatible client can use the model at **http://127.0.0.1:8080/v1** while it runs.
+Any OpenAI-compatible client can use the model at **http://127.0.0.1:8080/v1** while it runs, including a LiveKit voice agent: see [docs/livekit.md](docs/livekit.md).
+
+Pick models to download with the space bar: `python3 models/downloader.py`.
 
 ## How it works
 
@@ -211,6 +214,7 @@ Each runs with its model card's recommended sampling by default. Other Mixture-o
 - [x] RAM cap for the container (`./start.sh --ram-limit 20g`)
 - [x] Chat Studio: Stop, Regenerate, reasoning on/off, settings shown per reply
 - [ ] Models larger than RAM: measure how far NVMe paging stretches (`--ram-limit` below the model size)
+- [ ] Jetson Orin NX: run `./start.sh --nx` on the device and record its speed (laptop stand-in: 0.7–1.9 tokens/s with 3.3 GB of RAM)
 
 Full plan and decision log: [TASKS.md](TASKS.md) · scope: [PROJECT_SCOPE.md](PROJECT_SCOPE.md) · changes: [CHANGELOG.md](CHANGELOG.md)
 

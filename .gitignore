@@ -24,6 +24,7 @@ htmlcov/
 *.pth
 /models/*
 !/models/README.md
+!/models/downloader.py
 /weights/
 .cache/
 /huggingface/

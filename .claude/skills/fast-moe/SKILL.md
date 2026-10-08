@@ -56,6 +56,8 @@ order, known nits, and how this user likes to work. Check `git status`, `docker 
    - headless: `python -m engine.serve [--model ...] [--ctx N]`;
    - Docker, one command: `./start.sh [auto|gpu|cpu] [--no-browser] [--no-build] [--ram-limit 20g]`; it waits for the
      dashboard, opens it, streams logs, and Ctrl+C runs `docker compose down`;
+   - Jetson Orin NX: `./start.sh --nx [-- llama-server args]`, native and headless, experts
+     memory-mapped from the SSD ([docs/jetson-orin-nx.md](../../../docs/jetson-orin-nx.md));
    - plain Compose: `docker compose up` (GPU) or `docker compose -f docker-compose.cpu.yml up`.
 
 Done when `curl http://127.0.0.1:8080/health` returns `{"status":"ok"}` and one chat request

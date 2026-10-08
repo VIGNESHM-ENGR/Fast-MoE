@@ -5,6 +5,7 @@
 #   ./start.sh gpu          NVIDIA GPU (docker-compose.yml)
 #   ./start.sh cpu          CPU only (docker-compose.cpu.yml)
 #   ./start.sh --no-browser --no-build --ram-limit 20g
+#   ./start.sh --nx [-- llama-server args]   Jetson Orin NX 16 GB, native (docs/jetson-orin-nx.md)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,9 +16,11 @@ WAIT_SECONDS="${FAST_MOE_START_TIMEOUT:-600}"
 mode="auto"
 open_browser=1
 build=1
+nx=0
+llama_args=()
 
 usage() {
-  sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
@@ -25,11 +28,17 @@ Options:
   --no-browser       don't open the dashboard in a browser
   --no-build         start the existing image without rebuilding
   --ram-limit SIZE   cap the container's RAM, e.g. 20g or 16384m (default: no cap)
+  --nx               Jetson Orin NX 16 GB: no Docker; set up .venv, build llama.cpp
+                     for Orin once, and serve the API with every expert memory-mapped
+                     from the SSD (headless, no dashboard)
+  -- ARGS            with --nx: pass ARGS to llama-server (e.g. --api-key KEY)
   -h, --help         show this help
 
 Environment:
   FAST_MOE_START_TIMEOUT  seconds to wait for the dashboard (default 600)
   FAST_MOE_RAM_LIMIT      same as --ram-limit
+  FAST_MOE_NX_CTX         context with --nx (default 8192)
+  FAST_MOE_API_HOST       with --nx: 0.0.0.0 to reach the API from other machines
 EOF
 }
 
@@ -48,11 +57,65 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --ram-limit=*) FAST_MOE_RAM_LIMIT="${1#*=}" ;;
+    --nx) nx=1 ;;
+    --) shift; llama_args=("$@"); break ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "unknown argument: $1" ;;
   esac
   shift
 done
+
+port_busy() {
+  if command -v ss >/dev/null; then
+    ss -ltn "sport = :$1" 2>/dev/null | grep -q LISTEN
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+  fi
+}
+
+# Jetson Orin NX 16 GB: CPU and GPU share 16 GB, so GPU buffers are pinned RAM the page cache
+# can't reuse. Keep only attention/shared weights and the KV cache on the GPU (~2.5 GiB for
+# Qwen3.6) and leave every expert memory-mapped: the kernel pages them in from the SSD into
+# whatever RAM is free. The official llama.cpp CUDA images are amd64-only, hence native.
+run_nx() {
+  [[ -f /etc/nv_tegra_release ]] || die "--nx is for NVIDIA Jetson (no /etc/nv_tegra_release here)."
+  [[ -z "${FAST_MOE_RAM_LIMIT:-}" ]] || die "--ram-limit applies to Docker only; see docs/jetson-orin-nx.md."
+  python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))' \
+    || die "Python 3.10+ is required (JetPack 6). This is $(python3 --version 2>&1)."
+  cd "$ROOT"
+  export PATH="$ROOT/.venv/bin:/usr/local/cuda/bin:$PATH"
+
+  if [[ ! -x .venv/bin/python ]]; then
+    say "Creating .venv ..."
+    python3 -m venv .venv || die "python3 -m venv failed; install it: sudo apt install python3-venv python3-pip"
+  fi
+  if [[ $build -eq 1 ]] || ! .venv/bin/python -c 'import importlib.metadata as m; m.version("fast-moe")' 2>/dev/null; then
+    .venv/bin/python -m pip --version >/dev/null 2>&1 || die ".venv has no pip; remove .venv and rerun, or: sudo apt install python3-pip"
+    say "Installing Fast-MoE into .venv ..."
+    .venv/bin/python -m pip install --quiet -e . || die "pip install failed (output above)."
+  fi
+
+  if [[ ! -x third_party/llama.cpp/build/bin/llama-server || ! -x third_party/llama.cpp/build/bin/llama-fit-params ]]; then
+    command -v nvcc >/dev/null || die "nvcc not found; install the CUDA toolkit: sudo apt install nvidia-jetpack"
+    # build_llama_cpp.sh needs CMake 3.24+; Ubuntu 22.04 (JetPack 6) ships 3.22.
+    if ! cmake --version 2>/dev/null | awk 'NR==1 {split($3, v, "."); exit !(v[1] > 3 || (v[1] == 3 && v[2] >= 24))}'; then
+      say "Installing a newer CMake into .venv ..."
+      .venv/bin/python -m pip install --quiet "cmake>=3.24" || die "Could not install CMake."
+    fi
+    say "Building llama.cpp for Jetson Orin (CUDA arch 87); this takes a while the first time ..."
+    CUDA_ARCH=87 scripts/build_llama_cpp.sh
+  fi
+
+  port_busy 8080 && die "Port 8080 is already in use. Stop whatever is using it and retry."
+  say "Serving Qwen3.6-35B-A3B with experts paged from the SSD; Ctrl+C stops it."
+  exec .venv/bin/python -m engine.serve --cpu-moe --ctx "${FAST_MOE_NX_CTX:-8192}" ${llama_args[@]+-- "${llama_args[@]}"}
+}
+
+if [[ $nx -eq 1 ]]; then
+  run_nx
+elif [[ ${#llama_args[@]} -gt 0 ]]; then
+  die "'--' llama-server arguments only work with --nx."
+fi
 
 if [[ -n "${FAST_MOE_RAM_LIMIT:-}" ]]; then
   [[ "$FAST_MOE_RAM_LIMIT" =~ ^[1-9][0-9]*[gGmM]$ ]] || die "RAM limit must look like 20g or 16384m, got '$FAST_MOE_RAM_LIMIT'."
@@ -95,13 +158,6 @@ else
 fi
 compose=(docker compose -f "$compose_file")
 
-port_busy() {
-  if command -v ss >/dev/null; then
-    ss -ltn "sport = :$1" 2>/dev/null | grep -q LISTEN
-  else
-    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
-  fi
-}
 for port in 7860 8080; do
   port_busy "$port" && die "Port $port is already in use. Stop whatever is using it (e.g. an earlier Fast-MoE) and retry."
 done

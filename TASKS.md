@@ -22,6 +22,9 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
   Gemma 4 26B-A4B, Qwen3-30B-A3B.
 
 **Next up, in priority order:**
+0. Jetson Orin NX 16 GB: run `./start.sh --nx` on the device (JetPack 6), record decode
+   tok/s, prompt time and GPU memory in `docs/jetson-orin-nx.md`. Laptop stand-in with
+   3.3 GB of RAM: 0.66–1.94 tok/s, ~15 s prompt, ~100 GB read for ~130 tokens.
 1. M9: measure a model larger than the RAM cap (`./start.sh --ram-limit 8g` with
    Qwen3.6, 19 GiB). This answers the user's question about running from VRAM + SSD
    without much RAM: record decode tok/s, page faults and NVMe read rate. The
@@ -261,3 +264,11 @@ benchmarks need the GPU.
 - Chat Studio: reasoning was always on (a shadowed argument), and there was no
   Stop. Fixed and covered by `tests/test_chat.py`.
 
+**2026-10-08 — Jetson Orin NX and LiveKit**
+- Jetson runs natively (`./start.sh --nx`): the official llama.cpp CUDA images are amd64
+  only and NVML is not supported on Jetson, so Docker and the dashboard are out for now.
+- On unified memory llama.cpp reads free GPU memory as `MemAvailable`, so `--fit` would
+  pin most of the 16 GB. `--cpu-moe` with a fixed `-c` keeps the GPU part at 2.7 GiB and
+  leaves every expert memory-mapped; the user has ~6 GB free and keeps Qwen3.6 (19 GiB).
+- LiveKit needs no code: its `openai.LLM(base_url=...)` works against llama-server.
+  Qwen3.6 with thinking off skips tools unless the instructions say to call them.

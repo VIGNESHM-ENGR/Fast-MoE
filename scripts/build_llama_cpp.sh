@@ -8,7 +8,7 @@ set -euo pipefail
 
 LLAMA_CPP_TAG="${LLAMA_CPP_TAG:-b10937}"
 GGML_CUDA="${GGML_CUDA:-ON}"
-CUDA_ARCH="${CUDA_ARCH:-native}"   # e.g. 86 for RTX 30xx, 89 for RTX 40xx
+CUDA_ARCH="${CUDA_ARCH:-native}"   # e.g. 86 for RTX 30xx, 89 for RTX 40xx, 87 for Jetson Orin
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/third_party/llama.cpp"
 
@@ -24,6 +24,6 @@ cmake -S "$SRC" -B "$SRC/build" \
   -DGGML_CUDA="$GGML_CUDA" \
   -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" \
   -DLLAMA_CURL=OFF
-cmake --build "$SRC/build" --config Release -j "$(nproc)" --target llama-server llama-bench
+cmake --build "$SRC/build" --config Release -j "$(nproc)" --target llama-server llama-fit-params llama-bench
 
 echo "Built: $SRC/build/bin/llama-server"
