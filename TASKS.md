@@ -8,6 +8,41 @@ Principle: **integrate tested community projects, don't invent.** Inference is
 llama.cpp's `llama-server`; downloads are `huggingface_hub`; UI is Gradio.
 Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 
+## Status and hand-off (2026-09-15, v1.2.0)
+
+**Works today, verified on the reference laptop** (RTX 3060 Laptop 6 GB, i5-11400H,
+38 GB RAM, NVMe):
+- `./start.sh [auto|gpu|cpu] [--ram-limit 20g]` runs the Docker stack; Ctrl+C stops it.
+- Dashboard: placement preview and launch, memory tiers with the model's page cache,
+  a warning when context pushes whole layers onto the CPU, per-model default context.
+- Chat Studio: presets and tuning that reach llama-server, reasoning on/off, Stop,
+  Regenerate, Undo, and a line showing the settings each reply was sent with.
+- Headless: `python -m engine.serve`; benchmark: `python -m benchmarks.bench_context`.
+- Three catalog models, all downloaded in `./models`: Qwen3.6-35B-A3B (default),
+  Gemma 4 26B-A4B, Qwen3-30B-A3B.
+
+**Next up, in priority order:**
+1. M9: measure a model larger than the RAM cap (`./start.sh --ram-limit 8g` with
+   Qwen3.6, 19 GiB). This answers the user's question about running from VRAM + SSD
+   without much RAM: record decode tok/s, page faults and NVMe read rate. The
+   estimate so far, not measured, is about 2.4 tok/s.
+2. M8: `--fit` placement vs. hand-tuned `--n-cpu-moe` on the same hardware
+   (`benchmarks/bench_throughput.py` is still a stub).
+3. M6: model download with progress from the UI.
+4. Measure Qwen3-30B-A3B's default context (still 4096; its max is 40,960).
+5. Refresh `docs/images/dashboard-chat.png`: it predates the Stop button and the
+   settings line.
+
+**Known nits:** the placement summary says "Layers 6 run" for a single layer; the
+benchmark's prompt tok/s comes from a ~25-token prompt, so it says little about
+prefill speed.
+
+**Working with this user:** commits are theirs alone (no attribution lines); Q4 GGUF
+only; integrate existing projects instead of writing new engines; publish no
+container images; do what was asked without extra rebuilds or side work. Their
+Docker stack is often running with a model loaded: say so before stopping it, since
+benchmarks need the GPU.
+
 ## M0 — Repo scaffolding & docs
 
 - [x] `git init`, default branch `main`, `.gitignore`, `.dockerignore`, Apache-2.0 `LICENSE`
@@ -153,8 +188,10 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 
 ## M8 — Benchmarks
 
+- [x] `benchmarks/bench_context.py`: decode tok/s, GPU utilisation, VRAM and
+      placement at several context sizes, through the same `Runner` as the UI
 - [ ] `benchmarks/bench_throughput.py` via the OpenAI API (TTFT, prompt and
-      decode tok/s at several context lengths), plus `llama-bench`
+      decode tok/s), plus `llama-bench`
 - [ ] `--fit` auto placement vs. manual `--n-cpu-moe` sweeps on the same
       hardware; results in `benchmarks/results/`
 
@@ -162,7 +199,9 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
 
 - [ ] llama.cpp memory-maps GGUF files, so the OS page cache already pages
       expert weights between RAM and NVMe. Measure it with a model larger
-      than RAM (RSS, page faults, tok/s) before building anything
+      than RAM (RSS, page faults, tok/s) before building anything. Tooling is
+      ready: `./start.sh --ram-limit 8g` caps the container below the model
+      size, and the RAM meter shows the model's page cache
 - [ ] Only if measurements show a real gap: prefetch / pinning experiments
       (MoE-Infinity, PreScope ideas), or the KTransformers backend
 
@@ -209,3 +248,16 @@ Fast-MoE's own code is the glue, the zero-config defaults and the visuals.
   256 experts, top-8 + shared expert, 262K context) is supported by llama.cpp
   (`qwen35moe`). Default is now `ggml-org/Qwen3.6-35B-A3B-GGUF` Q4_K_M (19.0 GiB).
   Qwen3-30B-A3B stays useful as a second test model.
+
+**2026-09-15 — v1.2.0: measure before tuning, make the model's state visible**
+- The user saw a pegged CPU, a nearly idle GPU and "empty" RAM with Gemma 4 at
+  64K context. Diagnosis: MoE decode waits on CPU expert compute; at 64K the fit
+  left layers 0-5 entirely on the CPU; mmap weights sit in page cache.
+- Decided from `bench_context.py` rather than guessing: per-model default
+  context (Qwen3.6 64K, Gemma 4 32K), a warning for CPU-only layers, and the
+  page cache shown in the RAM meter.
+- A RAM cap (`--ram-limit`) is offered, but it does not speed anything up; a
+  VRAM + SSD setup is expected to be slower and is queued for M9 measurement.
+- Chat Studio: reasoning was always on (a shadowed argument), and there was no
+  Stop. Fixed and covered by `tests/test_chat.py`.
+

@@ -26,7 +26,10 @@ the catalog with official settings and verified numbers.
    the sampling matches the card. `ruff` and `pytest` pass.
 8. **Run it for real** (verify.md): Preview Placement and Apply & Start in the dashboard, one
    chat with the Model card preset, and note placement, context, time to live and decode speed.
-9. **Document**: add a row to "Tested with" in `README.md` with the measured numbers, an entry
+9. **Pick its default context**: `python -m benchmarks.bench_context <gguf>`; set
+   `default_ctx` to the largest context before decode drops or whole layers go CPU-only, and
+   assert it in `tests/models/test_catalog.py`.
+10. **Document**: add a row to "Supported models" in `README.md` with the measured numbers, an entry
    under `[Unreleased]` in `CHANGELOG.md`, and the reference row in `verify.md`.
 
 Done when the model answers in the dashboard, its numbers are in the README, and CI is green.

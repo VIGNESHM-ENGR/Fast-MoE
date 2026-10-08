@@ -4,6 +4,7 @@
 
 ### Run a 35-billion-parameter AI model on a 6 GB gaming laptop, and see exactly where every part of it lives.
 
+[![Release](https://img.shields.io/github/v/release/VIGNESHM-ENGR/Fast-MoE)](https://github.com/VIGNESHM-ENGR/Fast-MoE/releases/latest)
 [![CI](https://github.com/VIGNESHM-ENGR/Fast-MoE/actions/workflows/ci.yml/badge.svg)](https://github.com/VIGNESHM-ENGR/Fast-MoE/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)
@@ -172,6 +173,7 @@ flowchart LR
 | `LLAMA_CPP_BIN_DIR` | native build | Directory containing `llama-server` |
 | `FAST_MOE_API_HOST` | `127.0.0.1` | Address `llama-server` listens on |
 | `FAST_MOE_UI_HOST` / `FAST_MOE_UI_PORT` | `127.0.0.1` / `7860` | Dashboard address |
+| `FAST_MOE_RAM_LIMIT` | unset (no cap) | Container RAM cap used by compose, e.g. `20g` |
 </details>
 
 <details>
@@ -182,6 +184,7 @@ engine/hardware/   hardware profiler and memory budgets
 engine/llama/      fit-params parsing, GGUF layout, placement, llama-server supervisor
 engine/models/     model downloader, MoE architecture descriptor
 engine/serve.py    headless one-command launcher
+benchmarks/        bench_context.py: speed and placement per context size
 ui/                Gradio dashboard (board, chat telemetry, metrics)
 tests/             unit tests (no GPU needed); CI runs lint, tests and a Docker smoke test
 ```
@@ -191,11 +194,11 @@ tests/             unit tests (no GPU needed); CI runs lint, tests and a Docker 
 
 These are verified on the 6 GB laptop and listed in the dashboard's model picker (with a one-click download if missing):
 
-| Model | Download (Q4) | Architecture | Result on the 6 GB laptop |
-|---|---|---|---|
-| **Qwen3.6-35B-A3B** | 19.0 GiB · [ggml-org](https://huggingface.co/ggml-org/Qwen3.6-35B-A3B-GGUF) | 40 layers, 256 experts, 8 active | 18.3 tokens/s · layers 0–3 on GPU |
-| **Gemma 4 26B-A4B** | 15.8 GiB · [unsloth UD-Q4_K_M](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) | 30 layers, 128 experts, 8 active + 1 shared | 10.2 tokens/s · layers 0–1 on GPU |
-| **Qwen3-30B-A3B** | 17.3 GiB · [Qwen](https://huggingface.co/Qwen/Qwen3-30B-A3B-GGUF) | 48 layers, 128 experts, 8 active | 16–18 tokens/s · layers 0–7 on GPU |
+| Model | Download (Q4) | Architecture | Result on the 6 GB laptop | Default context |
+|---|---|---|---|---|
+| **Qwen3.6-35B-A3B** | 19.0 GiB · [ggml-org](https://huggingface.co/ggml-org/Qwen3.6-35B-A3B-GGUF) | 40 layers, 256 experts, 8 active | 18.3 tokens/s · layers 0–3 on GPU | 64K (measured) |
+| **Gemma 4 26B-A4B** | 15.8 GiB · [unsloth UD-Q4_K_M](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) | 30 layers, 128 experts, 8 active + 1 shared | 10.2 tokens/s · layers 0–1 on GPU | 32K (measured) |
+| **Qwen3-30B-A3B** | 17.3 GiB · [Qwen](https://huggingface.co/Qwen/Qwen3-30B-A3B-GGUF) | 48 layers, 128 experts, 8 active | 16–18 tokens/s · layers 0–7 on GPU | 4K (not yet measured) |
 
 Each runs with its model card's recommended sampling by default. Other Mixture-of-Experts GGUF models that llama.cpp supports load too (pick the file or type a Hugging Face repo); these three are the ones verified so far. Quantized (Q4) weights only.
 
@@ -205,7 +208,9 @@ Each runs with its model card's recommended sampling by default. Other Mixture-o
 - [ ] Benchmarks against hand-tuned `--n-cpu-moe` on the same hardware
 - [x] Recommended context length per model, from measurements
 - [ ] Live per-expert activity (needs routing statistics llama.cpp does not expose yet)
-- [ ] Models larger than RAM: measure how far NVMe paging stretches
+- [x] RAM cap for the container (`./start.sh --ram-limit 20g`)
+- [x] Chat Studio: Stop, Regenerate, reasoning on/off, settings shown per reply
+- [ ] Models larger than RAM: measure how far NVMe paging stretches (`--ram-limit` below the model size)
 
 Full plan and decision log: [TASKS.md](TASKS.md) · scope: [PROJECT_SCOPE.md](PROJECT_SCOPE.md) · changes: [CHANGELOG.md](CHANGELOG.md)
 

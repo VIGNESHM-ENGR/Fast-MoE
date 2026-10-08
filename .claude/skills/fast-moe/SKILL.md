@@ -31,6 +31,15 @@ the OpenAI API; `huggingface_hub` does downloads; Gradio draws the UI.
 7. **Docs travel with the change.** Update `CHANGELOG.md` (`[Unreleased]`), tick or add items
    in `TASKS.md` (log plan changes under "Plan revisions"), and update `README.md` when
    something user-visible or measured changes.
+8. **Scope to the request.** Do what the user asked; propose extras instead of doing them
+   (an unrequested image rebuild was rejected once). The user's Docker stack is often running
+   with a model loaded: say so before stopping it for GPU work.
+
+## Start of a session
+
+Read "Status and hand-off" at the top of `TASKS.md`: what works, the next tasks in priority
+order, known nits, and how this user likes to work. Check `git status`, `docker ps` and
+`nvidia-smi` before starting servers; port 8080 or the GPU may already be taken.
 
 ## Pick the task
 
@@ -69,6 +78,13 @@ numbers.
 ### Add or support a model
 
 Follow [references/add-a-model.md](references/add-a-model.md).
+
+### Measure speed or pick a default context
+
+`python -m benchmarks.bench_context <gguf> [--ctx 4096 16384 32768 65536]` fits, starts,
+generates 256 tokens and prints a table (context, CPU-only layers, experts GPU/RAM, VRAM, GPU
+busy, tok/s). It needs the GPU to itself. Put results in `CatalogModel.default_ctx`, README,
+TASKS.md and the reference table in [references/verify.md](references/verify.md).
 
 ### Debug
 

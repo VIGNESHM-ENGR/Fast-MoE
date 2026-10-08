@@ -50,6 +50,23 @@ page.wait_for_selector(".fm-hud-state-pill.state-completed", timeout=600_000)
 Open every screenshot and look at it. Confirm: no page errors, numbers match the real plan,
 empty states say what to do next, nothing overflows at 390 px.
 
+## Chat Studio change
+
+Test against a real llama-server without restarting anything the user runs: start one on a
+spare port (`python -m engine.serve --model <gguf> --port 8082`), then run the dashboard with
+`runner.server` pointed at it (a small script that sets
+`app.runner.server = SimpleNamespace(url="http://127.0.0.1:8082", proc=SimpleNamespace(poll=lambda: None, pid=<pid>), stop=lambda: None, log_path=None, tail=[])`
+and calls `app.main()` with `FAST_MOE_UI_PORT=7870`). In the browser confirm:
+
+- Reasoning unchecked → no "Thinking" block in the reply;
+- the "Sent to llama-server" line matches the sliders, and `GET /slots` shows the same values;
+- Stop appears instead of Send while streaming; after Stop, `/slots` shows no
+  `is_processing` slot within about a second, and the partial answer ends in "Stopped";
+- Regenerate (↻ on the last answer) streams a new reply with the current settings;
+- a slider edit shows "Custom settings"; no page errors.
+
+Stop the helper processes by PID; `pkill -f <text>` also matches the agent's own shell.
+
 ## Docker change
 
 ```bash
@@ -87,3 +104,13 @@ machine is a regression to explain.
 | Qwen3.6-35B-A3B, CPU-only Docker | all 40 layers RAM, 262,144 ctx | 54 s | 3.9 tok/s |
 | Qwen3-30B-A3B | layers 0-7 GPU, 8 split, 9-47 RAM | 7 s (`engine.serve`) | 16-18 tok/s |
 | Gemma 4 26B-A4B (UD-Q4_K_M) | layers 0-1 GPU, 2 split, 3-29 RAM | 15 s (preview 22 s) | 10.2 tok/s, TTFT 3.6 s |
+| Gemma 4, Docker `--ram-limit 20g` | same; 15.9 GB model in page cache | 18 s | 9.1 tok/s with reasoning |
+
+`bench_context.py` (256 tokens, reasoning off), decode tok/s at 4K / 16K / 32K / 64K:
+
+| Model | 4K | 16K | 32K | 64K | Notes |
+|---|---|---|---|---|---|
+| Qwen3.6-35B-A3B | 22.1 | 21.5 | 21.2 | 20.6 | every layer on GPU; GPU busy 23-26 % |
+| Gemma 4 26B-A4B | 15.4 | 14.8 | 14.7 | 10.4 | 64K: `-ngl 25`, layers 0-5 CPU-only; GPU busy 19-20 %, 11 % at 64K |
+
+Chat Studio Stop: UI stopped in 0.35 s, llama-server slot free 0.63 s after the click.

@@ -28,20 +28,22 @@ GGUF file (models/) ──┬─▶ llama-fit-params ──▶ FitResult (-c, -n
 | `engine/hardware/profiler.py` | GPU via NVML, RAM (cgroup-aware), disk kind and speed probe, CPU flags |
 | `engine/hardware/allocator.py` | per-tier budgets with reserves; shown on the Hardware tab |
 | `engine/models/model_downloader.py` | `huggingface_hub` downloads, quant matching, `local_model()` lookup |
-| `engine/models/catalog.py` | tested models: repo, quant, sizes, expert layout, model-card sampling |
+| `engine/models/catalog.py` | tested models: repo, quant, sizes, expert layout, model-card sampling, measured `default_ctx` |
 | `engine/llama/fit.py` | run and parse `llama-fit-params` |
 | `engine/llama/layout.py` | read GGUF tensors; map `-ngl`/`-ot` onto them with llama.cpp's rules |
 | `engine/llama/server.py` | find binaries, port check, supervise `llama-server`, health, log tail |
-| `engine/llama/runner.py` | `RunSettings` → `plan_run()` → `RunPlan`; `Runner.launch(plan)` |
-| `engine/serve.py` | headless launcher that prints the plan then serves |
-| `ui/app.py` | Gradio layout, event handlers, process-global panel state, theme |
+| `engine/llama/runner.py` | `RunSettings` → `plan_run()` → `RunPlan`; `Runner.launch(plan)`; `cpu_attention_layers` / `context_warning` |
+| `engine/serve.py` | headless launcher that prints the plan (and context warning) then serves |
+| `ui/app.py` | Gradio layout, event handlers, process-global panel state, theme; chat streaming (`chat`, `_reply`, `stop_chat`, `prepare_retry`, `undo`) |
 | `ui/board.py` | Engine tab HTML: explainer cards, memory tiers, GPU layer cards, layer matrix |
-| `ui/chat_hud.py` | chat telemetry gauges |
-| `ui/studio.py` | system prompt presets, sampling presets, `build_request()`, model card |
-| `ui/metrics.py` | NVML/psutil usage and `/metrics` parsing |
+| `ui/chat_hud.py` | chat telemetry gauges, states (incl. stopped), sent-settings line |
+| `ui/studio.py` | system prompt presets, sampling presets, `build_request()`, `settings_summary()`, model card |
+| `ui/metrics.py` | NVML VRAM, cgroup-aware RAM, llama-server `RssFile` (model page cache), `/metrics` parsing |
 | `ui/assets/board.css`, `ui/assets/fonts/` | all styling; self-hosted OFL fonts |
 | `Dockerfile`, `docker-compose*.yml` | one image on the official llama.cpp server image |
 | `scripts/build_llama_cpp.sh` | native pinned llama.cpp build |
+| `start.sh` | Docker launcher: mode detection, port checks, `--ram-limit`, Ctrl+C → `compose down` |
+| `benchmarks/bench_context.py` | decode speed and placement per context size via `Runner` |
 
 ## Shelved and stub code
 
@@ -59,6 +61,14 @@ Leave these unwired unless a task explicitly revives them:
   stops the server, fits, then launches.
 - `LlamaServer.url` always uses loopback, even when listening on `0.0.0.0`.
 - GGUF header reads are cached by path, size and mtime (`layout_for`), since a read takes seconds.
+- Chat Studio streams one reply at a time through `active_chat` (stream, stop event, busy
+  flag). Stop closes the OpenAI stream and llama-server cancels on disconnect; a Send while
+  busy yields `gr.skip()`. Handlers chained with `.then` get no event data, so Regenerate
+  stores its message in a `gr.State` first.
+- The tuning preset radio fires on `.input` (user clicks only); a slider edit sets it to
+  `None` ("custom"), and `apply_tuning_preset` leaves custom values alone.
+- Placement rule: `-ngl N` leaves layers `0 .. block_count - N` entirely on the CPU;
+  `cpu_attention_layers` is the single source for the board, summary and CLI warning.
 - Ports bind to localhost; compose publishes `127.0.0.1:7860` and `127.0.0.1:8080` only.
 - Project decisions and their reasons are logged in `TASKS.md` under "Plan revisions";
   product intent lives in `PRODUCT.md` and `PROJECT_SCOPE.md`.
